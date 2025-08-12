@@ -49,7 +49,7 @@ export function Home() {
             Portfolio Overview
           </h2>
           <Link
-            to="/account-overview"
+            to="/account"
             className="text-accent-mint hover:text-accent-mint/80 transition-colors"
           >
             <span className="body-small">View Details →</span>
@@ -184,7 +184,7 @@ export function Home() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="heading-medium text-text-primary">Recent Activity</h2>
           <Link
-            to="/account-overview"
+            to="/account"
             className="text-accent-mint hover:text-accent-mint/80 transition-colors"
           >
             <span className="body-small">View All →</span>

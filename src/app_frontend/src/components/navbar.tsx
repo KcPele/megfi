@@ -41,7 +41,7 @@ export function Navbar() {
             {/* Main navigation - desktop only */}
             <nav className="hidden md:flex items-center gap-6">
               <button
-                onClick={() => navigate("/")}
+                onClick={() => navigate("/home")}
                 className="body-regular text-text-secondary hover:text-text-primary transition-colors"
               >
                 Dashboard
@@ -104,7 +104,10 @@ export function Navbar() {
                   <span>Account Overview</span>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className="text-text-secondary hover:text-text-primary hover:bg-white/[0.05]">
+                <DropdownMenuItem
+                  onSelect={() => navigate("/settings")}
+                  className="text-text-secondary hover:text-text-primary hover:bg-white/[0.05]"
+                >
                   <Settings className="w-4 h-4 mr-2" />
                   <span>Settings</span>
                 </DropdownMenuItem>
@@ -149,7 +152,7 @@ export function Navbar() {
                   Assets
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => navigate("/account-overview")}
+                  onSelect={() => navigate("/account")}
                   className="text-text-secondary hover:text-text-primary hover:bg-white/[0.05]"
                 >
                   Account

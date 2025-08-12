@@ -3,6 +3,8 @@ import { Navbar } from "@/components/navbar";
 
 // Import your pages (create these files)
 import { Home } from "@/pages/home";
+import { Landing } from "@/components/landing";
+import { Settings } from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { DepositBTC } from "@/pages/deposit-btc";
 import { BorrowUSDC } from "@/pages/borrow-usdc";
@@ -18,7 +20,9 @@ function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<Home />} />
+            <Route index element={<Landing />} />
+            <Route path="home" element={<Home />} />
+            <Route path="settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
             <Route path="/deposit" element={<DepositBTC />} />
             <Route path="/borrow" element={<BorrowUSDC />} />
