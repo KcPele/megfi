@@ -28,9 +28,11 @@ export function AssetBalance({ symbol }: AssetBalanceProps) {
           <p className="text-xl text-muted-foreground">
             ${usdValue.toLocaleString()}
           </p>
-          <div className={`flex items-center gap-1 text-sm font-medium ${
-            isPositive ? 'text-accent-mint' : 'text-accent-pink'
-          }`}>
+          <div
+            className={`flex items-center gap-1 text-sm font-medium ${
+              isPositive ? "text-accent-mint" : "text-accent-pink"
+            }`}
+          >
             {isPositive ? (
               <TrendingUp className="w-4 h-4" />
             ) : (
@@ -49,7 +51,9 @@ export function AssetBalance({ symbol }: AssetBalanceProps) {
         className="inline-flex items-center gap-3 bg-bg-secondary/50 backdrop-blur-sm border border-accent-mint/10 rounded-xl px-6 py-4"
       >
         <div className="text-left">
-          <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
+          <p className="text-sm text-muted-foreground mb-1">
+            Available Balance
+          </p>
           <p className="text-2xl font-semibold">{balance.toLocaleString()}</p>
         </div>
         <div className="h-12 w-px bg-accent-mint/20" />
@@ -59,7 +63,7 @@ export function AssetBalance({ symbol }: AssetBalanceProps) {
         </div>
         <div className="relative group">
           <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-bg-tertiary rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-bg-tertiary rounded-lg text-xs sm:whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             Locked balance includes staked and collateralized assets
           </div>
         </div>

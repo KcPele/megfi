@@ -1,24 +1,30 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Copy, 
-  Check, 
-  Bitcoin, 
-  AlertCircle, 
-  Loader2, 
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Copy,
+  Check,
+  Bitcoin,
+  AlertCircle,
+  Loader2,
   ArrowLeft,
   QrCode,
-  Info
-} from 'lucide-react';
-import { useAuth } from '@/providers/auth-provider';
-import { app_backend, idlFactory, canisterId } from "@/../../declarations/app_backend";
+  Info,
+} from "lucide-react";
+import copy from "copy-to-clipboard";
+import { useAuth } from "@/providers/auth-provider";
+import {
+  app_backend,
+  idlFactory,
+  canisterId,
+} from "@/../../declarations/app_backend";
 import { createAgent } from "@dfinity/utils";
-import { useActors } from '@/hooks/useActors';
-import { Link } from 'react-router-dom';
+import { useActors } from "@/hooks/useActors";
+import { Link } from "react-router-dom";
+import QRCode from "qrcode";
 
-const host = "https://ic0.app"
+const host = "https://ic0.app";
 
 export function DepositBTC() {
   const [copied, setCopied] = useState(false);
@@ -29,9 +35,10 @@ export function DepositBTC() {
   const [btcAddress, setBtcAddress] = useState("");
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const { identity, login } = useAuth();
   const principal = identity?.getPrincipal();
-  const {mainCanister} = useActors();
+  const { mainCanister } = useActors();
 
   useEffect(() => {
     const fetchBtcAddress = async () => {
@@ -54,16 +61,36 @@ export function DepositBTC() {
     }
   }, [identity, mainCanister, principal]);
 
+  // Generate QR when address or dialog visibility changes
+  useEffect(() => {
+    if (!showQR || !btcAddress || !qrCanvasRef.current) return;
+    (async () => {
+      try {
+        await QRCode.toCanvas(qrCanvasRef.current!, btcAddress, {
+          errorCorrectionLevel: "M",
+          width: 240,
+          margin: 1,
+          color: {
+            dark: "#000000",
+            light: "#ffffff",
+          },
+        });
+      } catch (e) {
+        console.error("Failed to render QR", e);
+      }
+    })();
+  }, [showQR, btcAddress]);
+
   useEffect(() => {
     // Load minter info for required confirmations
     const loadInfo = async () => {
       try {
         const info = await (mainCanister as any).getMinterInfo();
-        if (info && typeof info.min_confirmations !== 'undefined') {
+        if (info && typeof info.min_confirmations !== "undefined") {
           setRequiredConfirmations(Number(info.min_confirmations));
         }
       } catch (e) {
-        console.error('Failed to load minter info', e);
+        console.error("Failed to load minter info", e);
       }
     };
     loadInfo();
@@ -75,36 +102,49 @@ export function DepositBTC() {
         }
         const res = await (mainCanister as any).updateBalance([principal], []);
         // When deposits are fully minted, treat as complete
-        if (res && 'Ok' in res) {
+        if (res && "Ok" in res) {
           setConfirmations(requiredConfirmations);
           setPendingUtxos([]);
           return;
         }
-        if (res && 'Err' in res && res.Err && 'NoNewUtxos' in res.Err) {
+        if (res && "Err" in res && res.Err && "NoNewUtxos" in res.Err) {
           const data = res.Err.NoNewUtxos;
-          const req = Number(data.required_confirmations || requiredConfirmations);
-          const cur = data.current_confirmations ? Number(data.current_confirmations[0]) : 0;
+          const req = Number(
+            typeof data.required_confirmations !== "undefined"
+              ? data.required_confirmations
+              : requiredConfirmations
+          );
+          const curArr = data.current_confirmations;
+          let cur = 0;
+          if (Array.isArray(curArr) && curArr.length > 0) {
+            const n = Number(curArr[0]);
+            if (Number.isFinite(n)) cur = n;
+          }
           setRequiredConfirmations(req);
           setConfirmations(Math.min(cur, req));
-          const pu = Array.isArray(data.pending_utxos) && data.pending_utxos[0]
-            ? data.pending_utxos[0]
-            : [];
+          const pu =
+            Array.isArray(data.pending_utxos) && data.pending_utxos[0]
+              ? data.pending_utxos[0]
+              : [];
           setPendingUtxos(pu);
-          const total = pu.reduce((acc: number, u: any) => acc + Number(u.value || 0), 0);
+          const total = pu.reduce(
+            (acc: number, u: any) => acc + Number(u.value || 0),
+            0
+          );
           setExpectedSats(total);
         }
       } catch (error) {
         console.error("Error fetching confirmations:", error);
       }
     }
-    
+
     updateBalance();
     const interval = setInterval(updateBalance, 60000);
     return () => clearInterval(interval);
   }, [principal, mainCanister]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(btcAddress);
+    copy(btcAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -118,21 +158,36 @@ export function DepositBTC() {
       {!identity && (
         <div className="mb-6 p-4 rounded-xl bg-bg-tertiary border border-white/10 flex items-center justify-between">
           <div>
-            <p className="body-regular text-text-primary font-medium">Sign in required</p>
-            <p className="body-small text-text-secondary">Connect Internet Identity to generate your BTC deposit address.</p>
+            <p className="body-regular text-text-primary font-medium">
+              Sign in required
+            </p>
+            <p className="body-small text-text-secondary">
+              Connect Internet Identity to generate your BTC deposit address.
+            </p>
           </div>
-          <button onClick={login} className="px-4 py-2 rounded-lg bg-accent-mint text-black font-medium hover:bg-accent-mint/90">Login</button>
+          <button
+            onClick={login}
+            className="px-4 py-2 rounded-lg bg-accent-mint text-black font-medium hover:bg-accent-mint/90"
+          >
+            Login
+          </button>
         </div>
       )}
       {/* Page Header */}
       <div className="mb-8">
-        <Link to="/" className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" />
           <span className="body-small">Back to Dashboard</span>
         </Link>
-        <h1 className="heading-large text-text-primary mb-2">Deposit Bitcoin</h1>
+        <h1 className="heading-large text-text-primary mb-2">
+          Deposit Bitcoin
+        </h1>
         <p className="body-regular text-text-secondary">
-          Bridge your BTC to ckBTC and start earning yield on the Internet Computer
+          Bridge your BTC to ckBTC and start earning yield on the Internet
+          Computer
         </p>
       </div>
 
@@ -150,8 +205,12 @@ export function DepositBTC() {
                 <Bitcoin className="w-6 h-6 text-accent-yellow" />
               </div>
               <div>
-                <h2 className="heading-medium text-text-primary">Your Bitcoin Address</h2>
-                <p className="body-small text-text-secondary">Send BTC to this address only</p>
+                <h2 className="heading-medium text-text-primary">
+                  Your Bitcoin Address
+                </h2>
+                <p className="body-small text-text-secondary">
+                  Send BTC to this address only
+                </p>
               </div>
             </div>
 
@@ -162,21 +221,23 @@ export function DepositBTC() {
             ) : btcAddress ? (
               <>
                 <div className="bg-bg-tertiary rounded-2xl p-6 mb-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="body-tiny text-text-muted uppercase tracking-wider">Bitcoin Address</p>
+                  <div className="flex sm:flex-row flex-col sm:items-center justify-between mb-4">
+                    <p className="body-tiny text-text-muted uppercase tracking-wider">
+                      Bitcoin Address
+                    </p>
                     <button
                       onClick={() => setShowQR(!showQR)}
                       className="btn-pill flex items-center gap-2 hover:bg-white/10 transition-colors"
                     >
                       <QrCode className="w-4 h-4" />
-                      <span>QR Code</span>
+                      <span>Show QR Code</span>
                     </button>
                   </div>
-                  
+
                   <div className="font-mono text-sm text-text-primary break-all bg-background/50 rounded-xl p-4">
                     {btcAddress}
                   </div>
-                  
+
                   <button
                     onClick={handleCopy}
                     className="mt-4 w-full bg-accent-mint text-text-inverse rounded-xl px-6 py-3 font-medium hover:bg-accent-mint/90 transition-colors flex items-center justify-center gap-2"
@@ -198,13 +259,10 @@ export function DepositBTC() {
                 {showQR && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    className="bg-white rounded-2xl p-8 mb-4 flex items-center justify-center"
+                    animate={{ height: "auto", opacity: 1 }}
+                    className="bg-bg-tertiary rounded-2xl p-8 mb-4 flex items-center justify-center"
                   >
-                    {/* QR Code would go here */}
-                    <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                      <span className="text-gray-500">QR Code</span>
-                    </div>
+                    <canvas ref={qrCanvasRef} className="w-48 h-48" />
                   </motion.div>
                 )}
               </>
@@ -213,7 +271,9 @@ export function DepositBTC() {
                 <div className="flex gap-3">
                   <AlertCircle className="w-5 h-5 text-semantic-negative flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="body-regular text-text-primary font-medium">Unable to generate address</p>
+                    <p className="body-regular text-text-primary font-medium">
+                      Unable to generate address
+                    </p>
                     <p className="body-small text-text-secondary mt-1">
                       Please ensure you're connected with a valid account.
                     </p>
@@ -230,12 +290,16 @@ export function DepositBTC() {
             transition={{ delay: 0.2 }}
             className="card-container mt-6"
           >
-            <h3 className="heading-medium text-text-primary mb-6">Transaction Status</h3>
-            
+            <h3 className="heading-medium text-text-primary mb-6">
+              Transaction Status
+            </h3>
+
             <div className="space-y-6">
               <div>
                 <div className="flex justify-between items-center mb-3">
-                  <span className="body-regular text-text-secondary">Confirmations</span>
+                  <span className="body-regular text-text-secondary">
+                    Confirmations
+                  </span>
                   <span className="body-regular font-semibold text-text-primary">
                     {confirmations} / {requiredConfirmations}
                   </span>
@@ -243,7 +307,12 @@ export function DepositBTC() {
                 <div className="w-full h-3 bg-bg-tertiary rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${(confirmations / Math.max(requiredConfirmations, 1)) * 100}%` }}
+                    animate={{
+                      width: `${
+                        (confirmations / Math.max(requiredConfirmations, 1)) *
+                        100
+                      }%`,
+                    }}
                     className="h-full bg-gradient-to-r from-accent-mint to-accent-teal rounded-full"
                     transition={{ duration: 0.5 }}
                   />
@@ -253,32 +322,61 @@ export function DepositBTC() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="card-mini">
                   <p className="body-small text-text-muted mb-1">Status</p>
-                  <p className="body-regular font-semibold text-accent-yellow">{confirmations >= requiredConfirmations ? 'Confirmed' : 'Pending'}</p>
+                  <p className="body-regular font-semibold text-accent-yellow">
+                    {confirmations >= requiredConfirmations
+                      ? "Confirmed"
+                      : "Pending"}
+                  </p>
                 </div>
                 <div className="card-mini">
                   <p className="body-small text-text-muted mb-1">Network</p>
-                  <p className="body-regular font-semibold text-text-primary">Bitcoin Mainnet</p>
+                  <p className="body-regular font-semibold text-text-primary">
+                    Bitcoin Mainnet
+                  </p>
                 </div>
                 <div className="card-mini">
-                  <p className="body-small text-text-muted mb-1">Expected Amount</p>
-                  <p className="body-regular font-semibold text-text-primary">{expectedSats > 0 ? (expectedSats / 1e8).toFixed(8) + ' BTC' : '—'}</p>
+                  <p className="body-small text-text-muted mb-1">
+                    Expected Amount
+                  </p>
+                  <p className="body-regular font-semibold text-text-primary">
+                    {expectedSats > 0
+                      ? (expectedSats / 1e8).toFixed(8) + " BTC"
+                      : "—"}
+                  </p>
                 </div>
                 <div className="card-mini">
-                  <p className="body-small text-text-muted mb-1">ckBTC to Receive</p>
-                  <p className="body-regular font-semibold text-text-primary">{expectedSats > 0 ? (expectedSats / 1e8).toFixed(8) + ' ckBTC' : '—'}</p>
+                  <p className="body-small text-text-muted mb-1">
+                    ckBTC to Receive
+                  </p>
+                  <p className="body-regular font-semibold text-text-primary">
+                    {expectedSats > 0
+                      ? (expectedSats / 1e8).toFixed(8) + " ckBTC"
+                      : "—"}
+                  </p>
                 </div>
               </div>
-              <p className="body-tiny text-text-secondary mt-2">Estimates based on pending UTXOs; network/KYT fees may apply.</p>
+              <p className="body-tiny text-text-secondary mt-2">
+                Estimates based on pending UTXOs; network/KYT fees may apply.
+              </p>
 
               {/* Pending UTXOs */}
               {pendingUtxos.length > 0 && (
                 <div className="mt-4">
-                  <p className="body-small text-text-muted mb-2">Pending UTXOs</p>
+                  <p className="body-small text-text-muted mb-2">
+                    Pending UTXOs
+                  </p>
                   <div className="space-y-2">
                     {pendingUtxos.map((u: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between bg-bg-tertiary rounded-xl px-3 py-2">
-                        <span className="text-xs text-text-secondary">vout {u.outpoint?.vout ?? 0}</span>
-                        <span className="text-xs text-text-primary">{u.confirmations ?? 0} conf</span>
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between bg-bg-tertiary rounded-xl px-3 py-2"
+                      >
+                        <span className="text-xs text-text-secondary">
+                          vout {u.outpoint?.vout ?? 0}
+                        </span>
+                        <span className="text-xs text-text-primary">
+                          {u.confirmations ?? 0} conf
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -300,7 +398,9 @@ export function DepositBTC() {
             <div className="flex gap-3">
               <Info className="w-5 h-5 text-accent-mint flex-shrink-0 mt-0.5" />
               <div>
-                <h4 className="body-regular font-semibold text-text-primary mb-2">Important Information</h4>
+                <h4 className="body-regular font-semibold text-text-primary mb-2">
+                  Important Information
+                </h4>
                 <ul className="space-y-2">
                   <li className="body-small text-text-secondary flex items-start gap-2">
                     <span className="text-accent-mint">•</span>
@@ -325,33 +425,53 @@ export function DepositBTC() {
 
           {/* Process Steps */}
           <div className="card-container">
-            <h4 className="heading-small text-text-primary mb-4">How it Works</h4>
+            <h4 className="heading-small text-text-primary mb-4">
+              How it Works
+            </h4>
             <div className="space-y-4">
               <div className="flex gap-3">
                 <div className="w-8 h-8 bg-accent-mint/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="body-small font-semibold text-accent-mint">1</span>
+                  <span className="body-small font-semibold text-accent-mint">
+                    1
+                  </span>
                 </div>
                 <div>
-                  <p className="body-small font-medium text-text-primary">Send BTC</p>
-                  <p className="body-tiny text-text-secondary">Transfer BTC to the provided address</p>
+                  <p className="body-small font-medium text-text-primary">
+                    Send BTC
+                  </p>
+                  <p className="body-tiny text-text-secondary">
+                    Transfer BTC to the provided address
+                  </p>
                 </div>
               </div>
               <div className="flex gap-3">
                 <div className="w-8 h-8 bg-accent-mint/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="body-small font-semibold text-accent-mint">2</span>
+                  <span className="body-small font-semibold text-accent-mint">
+                    2
+                  </span>
                 </div>
                 <div>
-                  <p className="body-small font-medium text-text-primary">Wait for Confirmations</p>
-                  <p className="body-tiny text-text-secondary">{requiredConfirmations} network confirmations required</p>
+                  <p className="body-small font-medium text-text-primary">
+                    Wait for Confirmations
+                  </p>
+                  <p className="body-tiny text-text-secondary">
+                    {requiredConfirmations} network confirmations required
+                  </p>
                 </div>
               </div>
               <div className="flex gap-3">
                 <div className="w-8 h-8 bg-accent-mint/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="body-small font-semibold text-accent-mint">3</span>
+                  <span className="body-small font-semibold text-accent-mint">
+                    3
+                  </span>
                 </div>
                 <div>
-                  <p className="body-small font-medium text-text-primary">Receive ckBTC</p>
-                  <p className="body-tiny text-text-secondary">ckBTC credited to your account</p>
+                  <p className="body-small font-medium text-text-primary">
+                    Receive ckBTC
+                  </p>
+                  <p className="body-tiny text-text-secondary">
+                    ckBTC credited to your account
+                  </p>
                 </div>
               </div>
             </div>
@@ -360,7 +480,10 @@ export function DepositBTC() {
           {/* Support */}
           <div className="card-mini">
             <p className="body-small text-text-secondary mb-2">Need help?</p>
-            <Link to="/support" className="text-accent-mint hover:text-accent-mint/80 body-small">
+            <Link
+              to="/support"
+              className="text-accent-mint hover:text-accent-mint/80 body-small"
+            >
               Contact Support →
             </Link>
           </div>

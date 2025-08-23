@@ -18,7 +18,7 @@ import { BorrowStable } from "@/pages/borrow-stable";
 
 function App() {
   return (
-    <div className="flex flex-col min-h-screen p-4">
+    <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-1">
         <Routes>

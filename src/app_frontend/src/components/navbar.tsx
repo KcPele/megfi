@@ -29,6 +29,10 @@ export function Navbar() {
   const { identity } = useAuth();
   const { mainCanister } = useActors();
   const [totalUsd, setTotalUsd] = useState<number | null>(null);
+  const principalText = identity ? identity.getPrincipal().toText() : null;
+  const displayId = principalText
+    ? `${principalText.slice(0, 8)}...${principalText.slice(-5)}`
+    : "Not signed in";
 
   useEffect(() => {
     const run = async () => {
@@ -94,7 +98,10 @@ export function Navbar() {
             </div>
 
             {/* Quick add button */}
-            <button className="btn-icon group">
+            <button
+              className="btn-icon group"
+              onClick={() => navigate("/deposit")}
+            >
               <Plus className="w-5 h-5 text-text-primary group-hover:scale-110 transition-transform" />
             </button>
 
@@ -112,7 +119,7 @@ export function Navbar() {
                 <div className="px-3 py-2">
                   <p className="body-small text-text-muted">Signed in as</p>
                   <p className="body-regular text-text-primary font-medium truncate">
-                    user@example.com
+                    {displayId}
                   </p>
                 </div>
                 <DropdownMenuSeparator className="bg-white/[0.08]" />
