@@ -237,3 +237,8 @@ leveraging ICP's chain-key technology for trustless BTC bridging, providing a si
 - More borrowing options
 - Yield strategies
 - Governance features
+
+## Live deployment
+
+- Backend canister: [app_backend (raw gateway)](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=rva2y-6yaaa-aaaau-abyia-cai)
+- Frontend app: [MegFi UI](https://rsb4m-taaaa-aaaau-abyiq-cai.icp0.io/)
