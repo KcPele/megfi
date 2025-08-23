@@ -6,6 +6,9 @@
       "init": "(opt record { btcMinter = principal \"vpyes-67777-77774-qaaeq-cai\"; ethMinter = principal \"sv3dd-oaaaa-aaaar-qacoa-cai\"; ckBTCckUSDCPair = principal \"uzt4z-lp777-77774-qaabq-cai\"; ckUSDCLedger = principal \"ucwa4-rx777-77774-qaada-cai\"; ckBTCLedger = principal \"ulvla-h7777-77774-qaacq-cai\" })"
     },
     "ckbtc_ckusdc": {
+      "type": "custom",
+      "candid": "src/app_frontend/src/lib/customDeclarations/icrc1_ledger.did",
+      "wasm": "https://download.dfinity.systems/ic/aba60ffbc46acfc8990bf4d5685c1360bd7026b9/canisters/ic-icrc1-ledger.wasm.gz",
       "remote": {
         "id": {
           "local": "uzt4z-lp777-77774-qaabq-cai"
@@ -13,6 +16,9 @@
       }
     },
     "ckbtc_icp": {
+      "type": "custom",
+      "candid": "src/app_frontend/src/lib/customDeclarations/icrc1_ledger.did",
+      "wasm": "https://download.dfinity.systems/ic/aba60ffbc46acfc8990bf4d5685c1360bd7026b9/canisters/ic-icrc1-ledger.wasm.gz",
       "remote": {
         "id": {
           "local": "umunu-kh777-77774-qaaca-cai"
@@ -24,14 +30,12 @@
       "type": "custom",
       "wasm": "https://download.dfinity.systems/ic/aba60ffbc46acfc8990bf4d5685c1360bd7026b9/canisters/ic-icrc1-ledger.wasm.gz",
       "init": "(variant { Init = record { token_symbol = \"ICP\"; token_name = \"Internet Computer Protocol\"; minting_account = record { owner = principal \"uxrrr-q7777-77774-qaaaq-cai\"; subaccount = null }; transfer_fee = 10000; metadata = vec {}; feature_flags = opt record { icrc2 = true }; initial_balances = vec {}; archive_options = record { num_blocks_to_archive = 1000; trigger_threshold = 2000; controller_id = principal \"uxrrr-q7777-77774-qaaaq-cai\"; cycles_for_archive_creation = opt 10000000000000; max_message_size_bytes = null; node_max_memory_size_bytes = null; max_transactions_per_response = null; more_controller_ids = null }; decimals = opt 8; max_memo_length = null; fee_collector_account = null } })"
-
     },
     "ckusdc": {
       "candid": "src/app_frontend/src/lib/customDeclarations/icrc1_ledger.did",
       "type": "custom",
       "wasm": "https://download.dfinity.systems/ic/aba60ffbc46acfc8990bf4d5685c1360bd7026b9/canisters/ic-icrc1-ledger.wasm.gz",
       "init": "(variant { Init = record { token_symbol = \"ckUSDC\"; token_name = \"Chain Key USDC\"; minting_account = record { owner = principal \"uxrrr-q7777-77774-qaaaq-cai\"; subaccount = null }; transfer_fee = 10000; metadata = vec {}; feature_flags = opt record { icrc2 = true }; initial_balances = vec {}; archive_options = record { num_blocks_to_archive = 1000; trigger_threshold = 2000; controller_id = principal \"uxrrr-q7777-77774-qaaaq-cai\"; cycles_for_archive_creation = opt 10000000000000; max_message_size_bytes = null; node_max_memory_size_bytes = null; max_transactions_per_response = null; more_controller_ids = null }; decimals = opt 6; max_memo_length = null; fee_collector_account = null } })"
-
     },
     "internet_identity": {
       "type": "custom",
@@ -48,17 +52,13 @@
       "type": "custom",
       "wasm": "https://download.dfinity.systems/ic/aba60ffbc46acfc8990bf4d5685c1360bd7026b9/canisters/ic-icrc1-ledger.wasm.gz",
       "init": "(variant { Init = record { token_symbol = \"ckBTC\"; token_name = \"Chain Key Bitcoin\"; minting_account = record { owner = principal \"v27v7-7x777-77774-qaaha-cai\"; subaccount = null }; transfer_fee = 10; metadata = vec {}; feature_flags = opt record { icrc2 = true }; initial_balances = vec {}; archive_options = record { num_blocks_to_archive = 1000; trigger_threshold = 2000; controller_id = principal \"v27v7-7x777-77774-qaaha-cai\"; cycles_for_archive_creation = opt 10000000000000; max_message_size_bytes = null; node_max_memory_size_bytes = null; max_transactions_per_response = null; more_controller_ids = null }; decimals = opt 8; max_memo_length = null; fee_collector_account = null } })"
-
     },
     "mock_btc_minter": {
       "main": "src/mock_btc_minter/main.mo",
       "type": "motoko"
     },
     "app_frontend": {
-      "dependencies": [
-        "app_backend",
-        "internet_identity"
-      ],
+      "dependencies": ["app_backend", "internet_identity"],
       "source": ["src/app_frontend/dist"],
       "type": "assets",
       "workspace": "app_frontend"
