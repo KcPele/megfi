@@ -36,11 +36,11 @@ export function Navbar() {
         const p = identity?.getPrincipal();
         if (!p) return;
         const res = await (mainCanister as any).getPortfolio(p);
-        if (res && typeof res.total_usd_e8s !== 'undefined') {
+        if (res && typeof res.total_usd_e8s !== "undefined") {
           setTotalUsd(Number(res.total_usd_e8s) / 1e8);
         }
       } catch (e) {
-        console.error('Failed to load portfolio', e);
+        console.error("Failed to load portfolio", e);
       }
     };
     run();
@@ -89,7 +89,7 @@ export function Navbar() {
               <Wallet className="w-4 h-4 text-text-muted" />
               <span className="body-small text-text-secondary">Balance:</span>
               <span className="body-regular font-semibold text-text-primary">
-                {totalUsd === null ? '—' : `$${totalUsd.toFixed(2)}`}
+                {totalUsd === null ? "—" : `$${totalUsd.toFixed(2)}`}
               </span>
             </div>
 
@@ -99,7 +99,7 @@ export function Navbar() {
             </button>
 
             {/* Theme toggle */}
-            <ModeToggle />
+            {/* <ModeToggle /> */}
 
             {/* User menu */}
             <DropdownMenu>
