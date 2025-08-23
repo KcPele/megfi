@@ -2,20 +2,22 @@
   "canisters": {
     "app_backend": {
       "main": "src/app_backend/main.mo",
-      "type": "motoko"
+      "type": "motoko",
+      "init": "(opt record { btcMinter = principal \"vpyes-67777-77774-qaaeq-cai\"; ethMinter = principal \"sv3dd-oaaaa-aaaar-qacoa-cai\"; ckBTCckUSDCPair = principal \"uzt4z-lp777-77774-qaabq-cai\"; ckUSDCLedger = principal \"ucwa4-rx777-77774-qaada-cai\"; ckBTCLedger = principal \"ulvla-h7777-77774-qaacq-cai\" })"
     },
     "ckbtc_ckusdc": {
-      "candid": "src/app_frontend/src/lib/customDeclarations/icrc1_ledger.did",
-      "type": "custom",
-      "wasm": "https://download.dfinity.systems/ic/aba60ffbc46acfc8990bf4d5685c1360bd7026b9/canisters/ic-icrc1-ledger.wasm.gz",
-      "init": "(variant { Init = record { token_symbol = \"ckBTC/ckUSDC\"; token_name = \"Chain Key BTC/USDC Swap\"; minting_account = record { owner = principal \"uxrrr-q7777-77774-qaaaq-cai\"; subaccount = null }; transfer_fee = 10000; metadata = vec {}; feature_flags = opt record { icrc2 = true }; initial_balances = vec {}; archive_options = record { num_blocks_to_archive = 1000; trigger_threshold = 2000; controller_id = principal \"uxrrr-q7777-77774-qaaaq-cai\"; cycles_for_archive_creation = opt 10000000000000; max_message_size_bytes = null; node_max_memory_size_bytes = null; max_transactions_per_response = null; more_controller_ids = null }; decimals = opt 8; max_memo_length = null; fee_collector_account = null } })"
+      "remote": {
+        "id": {
+          "local": "uzt4z-lp777-77774-qaabq-cai"
+        }
+      }
     },
     "ckbtc_icp": {
-      "candid": "src/app_frontend/src/lib/customDeclarations/icrc1_ledger.did",
-      "type": "custom",
-      "wasm": "https://download.dfinity.systems/ic/aba60ffbc46acfc8990bf4d5685c1360bd7026b9/canisters/ic-icrc1-ledger.wasm.gz",
-      "init": "(variant { Init = record { token_symbol = \"ckBTC/ICP\"; token_name = \"Chain Key BTC/ICP Swap\"; minting_account = record { owner = principal \"uxrrr-q7777-77774-qaaaq-cai\"; subaccount = null }; transfer_fee = 10000; metadata = vec {}; feature_flags = opt record { icrc2 = true }; initial_balances = vec {}; archive_options = record { num_blocks_to_archive = 1000; trigger_threshold = 2000; controller_id = principal \"uxrrr-q7777-77774-qaaaq-cai\"; cycles_for_archive_creation = opt 10000000000000; max_message_size_bytes = null; node_max_memory_size_bytes = null; max_transactions_per_response = null; more_controller_ids = null }; decimals = opt 8; max_memo_length = null; fee_collector_account = null } })"
-
+      "remote": {
+        "id": {
+          "local": "umunu-kh777-77774-qaaca-cai"
+        }
+      }
     },
     "icp": {
       "candid": "src/app_frontend/src/lib/customDeclarations/icrc1_ledger.did",
@@ -55,8 +57,7 @@
     "app_frontend": {
       "dependencies": [
         "app_backend",
-        "internet_identity",
-        "mock_btc_minter"
+        "internet_identity"
       ],
       "source": ["src/app_frontend/dist"],
       "type": "assets",

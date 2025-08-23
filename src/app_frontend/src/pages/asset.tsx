@@ -27,9 +27,35 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { useEffect, useState } from "react";
+import { useActors } from "@/hooks/useActors";
 
 export function Asset() {
   const { symbol } = useParams<{ symbol: string }>();
+  const { mainCanister } = useActors();
+  const [dynPrice, setDynPrice] = useState<number | null>(null);
+  const [liqThreshold, setLiqThreshold] = useState<number | null>(null);
+  const [maxLtv, setMaxLtv] = useState<number | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const [prices, cfg] = await Promise.all([
+          (mainCanister as any).getPrices(),
+          (mainCanister as any).getProtocolConfig(),
+        ]);
+        const p = symbol === 'USDC'
+          ? Number(prices.usdc_usd_e6s) / 1e6
+          : Number(prices.btc_usd_e8s) / 1e8;
+        setDynPrice(p);
+        setLiqThreshold(Number(cfg.liquidationLTVBps) / 100);
+        setMaxLtv(Number(cfg.maxLTVBps) / 100);
+      } catch (e) {
+        console.error('Failed to load asset details', e);
+      }
+    };
+    run();
+  }, [mainCanister, symbol]);
 
   // Mock data based on symbol
   const assetData = {
@@ -110,9 +136,7 @@ export function Asset() {
             <div className="flex items-center gap-4 mt-2">
               <span className="text-lg text-muted-foreground">{symbol}</span>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-medium">
-                  ${asset.price.toLocaleString()}
-                </span>
+                <span className="text-lg font-medium">${(dynPrice ?? asset.price).toLocaleString()}</span>
                 <div
                   className={`flex items-center gap-1 text-sm font-medium ${
                     isPositiveChange
@@ -175,22 +199,18 @@ export function Asset() {
                         <span className="text-sm text-muted-foreground">
                           Supply APY
                         </span>
-                        <span className="text-sm font-medium text-accent-mint">
-                          {asset.apy}%
-                        </span>
+                        <span className="text-sm font-medium text-accent-mint">—</span>
                       </div>
-                      <Progress value={asset.apy * 10} className="h-2" />
+                      <Progress value={0} className="h-2" />
                     </div>
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm text-muted-foreground">
                           Borrow APY
                         </span>
-                        <span className="text-sm font-medium text-accent-pink">
-                          {asset.borrowApy}%
-                        </span>
+                        <span className="text-sm font-medium text-accent-pink">—</span>
                       </div>
-                      <Progress value={asset.borrowApy * 10} className="h-2" />
+                      <Progress value={0} className="h-2" />
                     </div>
                   </div>
                   <div className="space-y-4">
@@ -198,17 +218,13 @@ export function Asset() {
                       <span className="text-sm text-muted-foreground">
                         Total Supply
                       </span>
-                      <span className="text-sm font-medium">
-                        ${(asset.totalSupply / 1000000).toFixed(1)}M
-                      </span>
+                      <span className="text-sm font-medium">—</span>
                     </div>
                     <div className="flex justify-between items-center p-3 rounded-lg bg-bg-secondary/50">
                       <span className="text-sm text-muted-foreground">
                         Total Borrowed
                       </span>
-                      <span className="text-sm font-medium">
-                        ${(asset.totalBorrowed / 1000000).toFixed(1)}M
-                      </span>
+                      <span className="text-sm font-medium">—</span>
                     </div>
                   </div>
                 </div>
@@ -216,19 +232,11 @@ export function Asset() {
                 {/* Utilization Rate */}
                 <div className="mt-6 p-4 rounded-lg bg-bg-secondary/50">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">
-                      Utilization Rate
-                    </span>
-                    <span className="text-sm font-medium">
-                      {asset.utilizationRate}%
-                    </span>
+                    <span className="text-sm font-medium">Utilization Rate</span>
+                    <span className="text-sm font-medium">—</span>
                   </div>
-                  <Progress value={asset.utilizationRate} className="h-3" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {asset.utilizationRate < 80
-                      ? "Healthy utilization"
-                      : "High utilization - rates may increase"}
-                  </p>
+                  <Progress value={0} className="h-3" />
+                  <p className="text-xs text-muted-foreground mt-2">—</p>
                 </div>
               </CardContent>
             </Card>
@@ -255,9 +263,7 @@ export function Asset() {
                       Reserve Factor
                     </span>
                   </div>
-                  <span className="text-sm font-medium">
-                    {asset.reserveFactor}%
-                  </span>
+                  <span className="text-sm font-medium">—</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-lg bg-bg-secondary/50">
                   <div className="flex items-center gap-2">
@@ -266,9 +272,16 @@ export function Asset() {
                       Liquidation Threshold
                     </span>
                   </div>
-                  <span className="text-sm font-medium">
-                    {asset.liquidationThreshold}%
-                  </span>
+                  <span className="text-sm font-medium">{liqThreshold !== null ? `${liqThreshold.toFixed(0)}%` : '—'}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg bg-bg-secondary/50">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Max LTV
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium">{maxLtv !== null ? `${maxLtv.toFixed(0)}%` : '—'}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-lg bg-bg-secondary/50">
                   <div className="flex items-center gap-2">
@@ -277,9 +290,7 @@ export function Asset() {
                       Liquidation Penalty
                     </span>
                   </div>
-                  <span className="text-sm font-medium text-accent-pink">
-                    {asset.liquidationPenalty}%
-                  </span>
+                  <span className="text-sm font-medium text-accent-pink">—</span>
                 </div>
                 <div className="mt-4 p-3 rounded-lg bg-accent-yellow/10 border border-accent-yellow/20">
                   <p className="text-xs text-accent-yellow">

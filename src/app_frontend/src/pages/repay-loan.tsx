@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   DollarSign, 
@@ -14,12 +14,20 @@ import {
   Loader2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useActors } from '@/hooks/useActors';
+import { useAuth } from '@/providers/auth-provider';
+import { useToast } from '@/hooks/use-toast';
+import { sanitizeDecimalInput } from '@/lib/utils';
+import { canisterId as BACKEND_ID } from '@/../../declarations/app_backend';
 
 export function RepayLoan() {
   const [amount, setAmount] = useState('');
   const [percentage, setPercentage] = useState(100);
   const [loading, setLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const { ckbtcLedger, ckusdc, mainCanister } = useActors();
+  const { identity } = useAuth();
+  const { toast } = useToast();
 
   // Mock loan data
   const loanData = {
@@ -34,11 +42,55 @@ export function RepayLoan() {
   };
 
   const handleRepayment = async () => {
+    if (!identity) {
+      toast({ title: 'Not authenticated', description: 'Please sign in.' });
+      return;
+    }
+    const repayStr = amount || repayAmount;
+    if (!repayStr || Number(repayStr) <= 0) {
+      toast({ title: 'Invalid amount', description: 'Enter a positive amount.' });
+      return;
+    }
+    const toNat = (val: string, decimals: number): bigint => {
+      const [w, f = ''] = val.split('.');
+      const fp = (f + '0'.repeat(decimals)).slice(0, decimals);
+      return BigInt(w || '0') * (10n ** BigInt(decimals)) + BigInt(fp || '0');
+    };
+    const repayNat = toNat(repayStr, 6);
+
     setLoading(true);
-    // Simulate repayment
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setLoading(false);
-    setShowConfirmation(true);
+    try {
+      // Approve backend to pull ckUSDC
+      const approveRes = await ckusdc.icrc2_approve({
+        fee: [],
+        memo: [],
+        from_subaccount: [],
+        created_at_time: [],
+        amount: repayNat,
+        expected_allowance: [],
+        expires_at: [],
+        spender: { owner: BACKEND_ID as any, subaccount: [] },
+      } as any);
+      if ('Err' in approveRes) {
+        toast({ title: 'Approve failed', description: JSON.stringify(approveRes.Err) });
+        setLoading(false);
+        return;
+      }
+
+      // Repay
+      const repayRes = await (mainCanister as any).repayDebt(repayNat);
+      if ('Err' in repayRes) {
+        toast({ title: 'Repay failed', description: String(repayRes.Err) });
+      } else {
+        toast({ title: 'Repay succeeded', description: `Block index: ${String(repayRes.Ok)}` });
+        setShowConfirmation(true);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Error', description: e?.message || 'Unexpected error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const repayAmount = (loanData.total * percentage / 100).toFixed(2);
@@ -85,9 +137,9 @@ export function RepayLoan() {
                     </div>
                   </div>
                   <input
-                    type="number"
+                    inputMode="decimal"
                     value={amount || repayAmount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => setAmount(sanitizeDecimalInput(e.target.value, 6))}
                     placeholder="0.00"
                     className="bg-transparent text-right text-2xl font-semibold text-text-primary focus:outline-none w-40"
                   />

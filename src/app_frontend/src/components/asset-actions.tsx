@@ -6,6 +6,7 @@ export function AssetActions() {
   const actions = [
     {
       label: "Repay",
+      path: "/repay",
       icon: RefreshCw,
       color: "bg-accent-yellow hover:bg-accent-yellow/90",
       textColor: "text-black",
@@ -13,6 +14,7 @@ export function AssetActions() {
     },
     {
       label: "Borrow",
+      path: "/borrow-stable",
       icon: Plus,
       color: "bg-accent-teal hover:bg-accent-teal/90",
       textColor: "text-black",
@@ -20,6 +22,7 @@ export function AssetActions() {
     },
     {
       label: "Supply",
+      path: "/supply",
       icon: ArrowUpRight,
       color: "bg-accent-mint hover:bg-accent-mint/90",
       textColor: "text-black",
@@ -27,6 +30,7 @@ export function AssetActions() {
     },
     {
       label: "Withdraw",
+      path: "/withdraw",
       icon: ArrowDownLeft,
       color: "bg-accent-pink hover:bg-accent-pink/90",
       textColor: "text-black",
@@ -46,7 +50,7 @@ export function AssetActions() {
             transition={{ duration: 0.5, delay: index * 0.1 }}
           >
             <Link
-              to={`/${action.label.toLowerCase()}`}
+              to={action.path}
               className={`group relative overflow-hidden ${action.color} ${action.textColor} rounded-2xl p-6 flex flex-col items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-lg`}
             >
               {/* Background Pattern */}

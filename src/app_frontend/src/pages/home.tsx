@@ -1,17 +1,83 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from 'react';
+import { useActors } from '@/hooks/useActors';
+import { useAuth } from '@/providers/auth-provider';
 import { Link } from "react-router-dom";
-import {
-  Wallet,
-  TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
-  Bitcoin,
-  DollarSign,
-  Activity,
-  PieChart,
-} from "lucide-react";
+import { Wallet, TrendingUp, ArrowUpRight, ArrowDownRight, Bitcoin, DollarSign, Activity, PieChart } from "lucide-react";
 
 export function Home() {
+  const { mainCanister } = useActors();
+  const { identity } = useAuth();
+  const [portfolioUsd, setPortfolioUsd] = useState<number>(0);
+  const [ckbtc, setCkbtc] = useState<number>(0);
+  const [availableUsd, setAvailableUsd] = useState<number>(0);
+  const [btcPrice, setBtcPrice] = useState<number>(0);
+  const [icpPrice, setIcpPrice] = useState<number>(0);
+  const [tvlUsd, setTvlUsd] = useState<number>(0);
+  const [utilizationPct, setUtilizationPct] = useState<number>(0);
+  const [activities, setActivities] = useState<any[]>([]);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const p = identity?.getPrincipal();
+        if (!p) return;
+        const [portfolio, cfg, prices, stats] = await Promise.all([
+          (mainCanister as any).getPortfolio(p),
+          (mainCanister as any).getProtocolConfig(),
+          (mainCanister as any).getPrices(),
+          (mainCanister as any).getProtocolStats(),
+        ]);
+        const usd = Number(portfolio.total_usd_e8s) / 1e8;
+        setPortfolioUsd(usd);
+        const ckbtcAmt = Number(portfolio.ckbtc) / 1e8;
+        setCkbtc(ckbtcAmt);
+        const maxLTV = Number(cfg.maxLTVBps) / 10000; // 0-1
+        // Available to borrow approximated by maxLTV of ckBTC USD value
+        const ckbtcUsd = (Number(portfolio.ckbtc) / 1e8) * (Number(prices.btc_usd_e8s) / 1e8);
+        setAvailableUsd(ckbtcUsd * maxLTV);
+        setBtcPrice(Number(prices.btc_usd_e8s) / 1e8);
+        setIcpPrice(Number(prices.icp_usd_e8s) / 1e8);
+        setTvlUsd(Number(stats.tvl_usd_e8s) / 1e8);
+        setUtilizationPct(Number(stats.utilization_bps) / 100);
+      } catch (e) {
+        console.error('Failed to load home metrics', e);
+      }
+    };
+    run();
+  }, [identity, mainCanister]);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const p = identity?.getPrincipal();
+        if (!p) return;
+        const res = await (mainCanister as any).getActivity(p);
+        setActivities(Array.isArray(res) ? res.slice(0, 5) : []);
+      } catch (e) {
+        console.error('Failed to load recent activity', e);
+      }
+    };
+    run();
+  }, [identity, mainCanister]);
+
+  const fmtKind = (k: string) => {
+    switch (k) {
+      case 'deposit_collateral': return 'Supplied Collateral';
+      case 'withdraw_collateral': return 'Withdrew Collateral';
+      case 'borrow': return 'Borrowed';
+      case 'repay': return 'Repaid';
+      default: return k;
+    }
+  };
+  const fmtDate = (t: bigint) => {
+    try { return new Date(Number(t) / 1_000_000).toLocaleString(); } catch { return ''; }
+  };
+  const fmtAmount = (a: bigint, token: string) => {
+    const decimals = token === 'ckBTC' ? 8 : token === 'ckUSDC' ? 6 : 0;
+    const n = Number(a) / Math.pow(10, decimals);
+    return `${n.toFixed(decimals > 2 ? 4 : 2)} ${token}`;
+  };
   const fadeInUp = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
@@ -62,7 +128,7 @@ export function Home() {
               <span className="body-small text-text-muted">Total Balance</span>
               <Wallet className="w-4 h-4 text-accent-mint" />
             </div>
-            <p className="heading-large text-text-primary">$30.00</p>
+            <p className="heading-large text-text-primary">${portfolioUsd.toFixed(2)}</p>
             <p className="metric-positive body-tiny mt-1">
               +12.5% <span className="text-text-muted">24h</span>
             </p>
@@ -73,8 +139,8 @@ export function Home() {
               <span className="body-small text-text-muted">BTC Holdings</span>
               <Bitcoin className="w-4 h-4 text-accent-yellow" />
             </div>
-            <p className="heading-large text-text-primary">0.0008</p>
-            <p className="body-tiny text-text-secondary">≈ $30.00</p>
+            <p className="heading-large text-text-primary">{ckbtc.toFixed(8)}</p>
+            <p className="body-tiny text-text-secondary">≈ ${(ckbtc * btcPrice).toFixed(2)}</p>
           </div>
 
           <div className="card-mini">
@@ -84,8 +150,8 @@ export function Home() {
               </span>
               <DollarSign className="w-4 h-4 text-accent-teal" />
             </div>
-            <p className="heading-large text-text-primary">$21.00</p>
-            <p className="body-tiny text-text-secondary">70% LTV</p>
+            <p className="heading-large text-text-primary">${availableUsd.toFixed(2)}</p>
+            <p className="body-tiny text-text-secondary">Based on max LTV</p>
           </div>
         </div>
       </motion.div>
@@ -94,7 +160,7 @@ export function Home() {
       <motion.section variants={fadeInUp}>
         <h2 className="heading-medium text-text-primary mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link to="/deposit-btc">
+          <Link to="/deposit">
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -152,29 +218,23 @@ export function Home() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <p className="body-tiny text-text-muted mb-1">BTC Price</p>
-            <p className="body-regular font-semibold text-text-primary">
-              $37,500
-            </p>
+            <p className="body-regular font-semibold text-text-primary">${btcPrice.toLocaleString()}</p>
             <p className="metric-positive body-tiny mt-1">+2.4%</p>
           </div>
           <div>
             <p className="body-tiny text-text-muted mb-1">ICP Price</p>
-            <p className="body-regular font-semibold text-text-primary">
-              $12.85
-            </p>
+            <p className="body-regular font-semibold text-text-primary">${icpPrice.toFixed(2)}</p>
             <p className="metric-negative body-tiny mt-1">-1.2%</p>
           </div>
           <div>
             <p className="body-tiny text-text-muted mb-1">TVL</p>
-            <p className="body-regular font-semibold text-text-primary">
-              $2.4M
-            </p>
-            <p className="metric-positive body-tiny mt-1">+8.7%</p>
+            <p className="body-regular font-semibold text-text-primary">${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+            <p className="body-tiny text-text-secondary mt-1">Total value locked</p>
           </div>
           <div>
-            <p className="body-tiny text-text-muted mb-1">APY</p>
-            <p className="body-regular font-semibold text-text-primary">4.5%</p>
-            <p className="body-tiny text-text-secondary mt-1">Variable</p>
+            <p className="body-tiny text-text-muted mb-1">Utilization</p>
+            <p className="body-regular font-semibold text-text-primary">{utilizationPct.toFixed(2)}%</p>
+            <p className="body-tiny text-text-secondary mt-1">Borrowed / TVL</p>
           </div>
         </div>
       </motion.section>
@@ -192,33 +252,23 @@ export function Home() {
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between py-3 border-b border-white/[0.05]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-accent-mint/20 rounded-full flex items-center justify-center">
-                <ArrowDownRight className="w-5 h-5 text-accent-mint" />
+          {activities.map((a, idx) => (
+            <div key={idx} className="flex items-center justify-between py-3 border-b border-white/[0.05]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-accent-mint/20 rounded-full flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-accent-mint" />
+                </div>
+                <div>
+                  <p className="body-regular text-text-primary">{fmtKind(String(a.kind))}</p>
+                  <p className="body-tiny text-text-muted">{fmtDate(a.time)}</p>
+                </div>
               </div>
-              <div>
-                <p className="body-regular text-text-primary">Deposited BTC</p>
-                <p className="body-tiny text-text-muted">2 hours ago</p>
-              </div>
+              <p className="body-regular font-semibold text-text-primary">{fmtAmount(a.amount, String(a.token))}</p>
             </div>
-            <p className="body-regular font-semibold text-semantic-positive">
-              +0.0008 BTC
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-accent-teal/20 rounded-full flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-accent-teal" />
-              </div>
-              <div>
-                <p className="body-regular text-text-primary">System Ready</p>
-                <p className="body-tiny text-text-muted">Ready to borrow</p>
-              </div>
-            </div>
-            <p className="body-regular text-text-secondary">Active</p>
-          </div>
+          ))}
+          {activities.length === 0 && (
+            <p className="body-small text-text-secondary">No recent activity</p>
+          )}
         </div>
       </motion.section>
     </motion.div>

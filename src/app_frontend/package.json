@@ -88,6 +88,8 @@
   "private": true,
   "scripts": {
     "build": "tsc && vite build",
+    "build:ic": "DFX_NETWORK=ic tsc && vite build",
+    "start:local": "cross-env DFX_NETWORK=local vite --port 3000",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\"",
     "prebuild": "dfx generate",
     "setup": "npm i && dfx canister create app_backend && dfx generate app_backend && dfx deploy",

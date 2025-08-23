@@ -7,100 +7,83 @@ import {
   TrendingUp, 
   Shield, 
   ArrowLeft,
-  Activity,
   Clock,
-  Percent,
   AlertCircle,
   CheckCircle,
   XCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useActors } from '@/hooks/useActors';
+import { useAuth } from '@/providers/auth-provider';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 export function AccountOverview() {
-  // Mock data - would be fetched from your backend
-  const portfolioData = [
-    { name: 'ckBTC', value: 30, color: 'hsl(var(--accent-yellow))' },
-    { name: 'USDC Borrowed', value: 21, color: 'hsl(var(--accent-teal))' },
-    { name: 'Available', value: 9, color: 'hsl(var(--bg-tertiary))' }
-  ];
-
-  const positions = [
-    {
-      id: 1,
-      asset: 'ckBTC',
-      amount: '0.0008',
-      value: '$30.00',
-      change: '+12.5%',
-      changeType: 'positive',
-      icon: Bitcoin,
-      color: 'accent-yellow'
-    },
-    {
-      id: 2,
-      asset: 'USDC Loan',
-      amount: '21.00',
-      value: '$21.00',
-      change: '4.5% APR',
-      changeType: 'neutral',
-      icon: DollarSign,
-      color: 'accent-teal'
-    }
-  ];
-
-  const healthMetrics = [
-    { 
-      label: 'Health Factor', 
-      value: '2.14', 
-      status: 'good',
-      description: 'Position is safe'
-    },
-    { 
-      label: 'Current LTV', 
-      value: '35%', 
-      max: '70%',
-      status: 'good' 
-    },
-    { 
-      label: 'Liquidation Price', 
-      value: '$22,059',
-      current: '$37,500',
-      status: 'warning' 
-    },
-    { 
-      label: 'Collateral Ratio', 
-      value: '285%',
-      min: '150%',
-      status: 'good' 
-    }
-  ];
-
-  const recentActivity = [
-    {
-      id: 1,
-      type: 'deposit',
-      asset: 'BTC',
-      amount: '0.0008',
-      time: '2 hours ago',
-      status: 'completed'
-    },
-    {
-      id: 2,
-      type: 'borrow',
-      asset: 'USDC',
-      amount: '21.00',
-      time: '1 hour ago',
-      status: 'completed'
-    },
-    {
-      id: 3,
-      type: 'interest',
-      asset: 'USDC',
-      amount: '0.08',
-      time: '1 day ago',
-      status: 'pending'
-    }
-  ];
+  const { mainCanister } = useActors();
+  const { identity } = useAuth();
+  const [totalUsd, setTotalUsd] = useState<number>(0);
+  const [borrowUsd, setBorrowUsd] = useState<number>(0);
+  const [collateralCkbtc, setCollateralCkbtc] = useState<number>(0);
+  const [ltv, setLtv] = useState<number>(0);
+  const [maxLtv, setMaxLtv] = useState<number>(0);
+  const [liqLtv, setLiqLtv] = useState<number>(0);
+  const [healthFactor, setHealthFactor] = useState<number | null>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [btcUsd, setBtcUsd] = useState<number>(0);
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const p = identity?.getPrincipal();
+        if (!p) return;
+        const [portfolio, pos, prices, cfg] = await Promise.all([
+          (mainCanister as any).getPortfolio(p),
+          (mainCanister as any).getPosition(),
+          (mainCanister as any).getPrices(),
+          (mainCanister as any).getProtocolConfig(),
+        ]);
+        setTotalUsd(Number(portfolio.total_usd_e8s) / 1e8);
+        const debtUsdE8s = (Number(pos.debt_ckusdc) * 10_000_000) / 1_000_000; // 1e8/1e6
+        const btcE8 = Number(prices.btc_usd_e8s);
+        setBtcUsd(btcE8 / 1e8);
+        const collateralUsdE8s = (Number(pos.collateral_ckbtc) * btcE8) / 1e8;
+        setBorrowUsd(debtUsdE8s / 1e8);
+        setCollateralCkbtc(Number(pos.collateral_ckbtc) / 1e8);
+        const curLtv = collateralUsdE8s > 0 ? (debtUsdE8s / collateralUsdE8s) : 0;
+        setLtv(curLtv);
+        const max = Number(cfg.maxLTVBps) / 10000;
+        const liq = Number(cfg.liquidationLTVBps) / 10000;
+        setMaxLtv(max);
+        setLiqLtv(liq);
+        setHealthFactor(curLtv > 0 ? (liq / curLtv) : null);
+      } catch (e) {
+        console.error('Failed to load account overview', e);
+      }
+    };
+    run();
+  }, [identity, mainCanister]);
+  
+  const portfolioData: { name: string; value: number; color: string }[] = useMemo(() => {
+    const collateralUsd = collateralCkbtc * btcUsd;
+    const available = Math.max(collateralUsd * maxLtv - borrowUsd, 0);
+    return [
+      { name: 'ckBTC', value: Number(collateralUsd.toFixed(2)), color: 'hsl(var(--accent-yellow))' },
+      { name: 'USDC Borrowed', value: Number(borrowUsd.toFixed(2)), color: 'hsl(var(--accent-teal))' },
+      { name: 'Available', value: Number(available.toFixed(2)), color: 'hsl(var(--bg-tertiary))' },
+    ];
+  }, [collateralCkbtc, btcUsd, maxLtv, borrowUsd]);
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const p = identity?.getPrincipal();
+        if (!p) return;
+        const res = await (mainCanister as any).getActivity(p);
+        setActivities(Array.isArray(res) ? res.slice(0, 6) : []);
+      } catch (e) {
+        console.error('Failed to load recent activity', e);
+      }
+    };
+    run();
+  }, [identity, mainCanister]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -160,7 +143,7 @@ export function AccountOverview() {
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {portfolioData.map((entry, index) => (
+                        {portfolioData.map((entry: { name: string; value: number; color: string }, index: number) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -169,7 +152,7 @@ export function AccountOverview() {
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <p className="heading-large text-text-primary">$60</p>
+                      <p className="heading-large text-text-primary">${totalUsd.toFixed(2)}</p>
                       <p className="body-tiny text-text-muted">Total Value</p>
                     </div>
                   </div>
@@ -183,7 +166,7 @@ export function AccountOverview() {
                     <span className="body-small text-text-muted">Net Worth</span>
                     <TrendingUp className="w-4 h-4 text-accent-mint" />
                   </div>
-                  <p className="heading-medium text-text-primary">$39.00</p>
+                  <p className="heading-medium text-text-primary">${(totalUsd - borrowUsd).toFixed(2)}</p>
                   <p className="metric-positive body-tiny mt-1">+$4.68 (13.6%)</p>
                 </div>
                 
@@ -192,7 +175,7 @@ export function AccountOverview() {
                     <span className="body-small text-text-muted">Total Borrowed</span>
                     <DollarSign className="w-4 h-4 text-accent-teal" />
                   </div>
-                  <p className="heading-medium text-text-primary">$21.00</p>
+                  <p className="heading-medium text-text-primary">${borrowUsd.toFixed(2)}</p>
                   <p className="body-tiny text-text-secondary mt-1">4.5% APR</p>
                 </div>
               </div>
@@ -207,33 +190,33 @@ export function AccountOverview() {
             className="card-container"
           >
             <h2 className="heading-medium text-text-primary mb-4">Active Positions</h2>
-            
             <div className="space-y-3">
-              {positions.map((position) => (
-                <div key={position.id} className="bg-bg-tertiary rounded-2xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 bg-${position.color}/20 rounded-xl flex items-center justify-center`}>
-                        <position.icon className={`w-5 h-5 text-${position.color}`} />
-                      </div>
-                      <div>
-                        <p className="body-regular font-medium text-text-primary">{position.asset}</p>
-                        <p className="body-tiny text-text-muted">{position.amount}</p>
-                      </div>
+              <div className="bg-bg-tertiary rounded-2xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-accent-yellow/20 rounded-xl flex items-center justify-center">
+                      <Bitcoin className="w-5 h-5 text-accent-yellow" />
                     </div>
-                    <div className="text-right">
-                      <p className="body-regular font-semibold text-text-primary">{position.value}</p>
-                      <p className={`body-tiny ${
-                        position.changeType === 'positive' ? 'text-semantic-positive' : 
-                        position.changeType === 'negative' ? 'text-semantic-negative' : 
-                        'text-text-secondary'
-                      }`}>
-                        {position.change}
-                      </p>
+                    <div>
+                      <p className="body-regular font-medium text-text-primary">ckBTC Collateral</p>
+                      <p className="body-tiny text-text-muted">{collateralCkbtc.toFixed(8)} ckBTC</p>
                     </div>
                   </div>
                 </div>
-              ))}
+              </div>
+              <div className="bg-bg-tertiary rounded-2xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-accent-teal/20 rounded-xl flex items-center justify-center">
+                      <DollarSign className="w-5 h-5 text-accent-teal" />
+                    </div>
+                    <div>
+                      <p className="body-regular font-medium text-text-primary">ckUSDC Debt</p>
+                      <p className="body-tiny text-text-muted">${borrowUsd.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </motion.div>
 
@@ -245,46 +228,38 @@ export function AccountOverview() {
             className="card-container"
           >
             <h2 className="heading-medium text-text-primary mb-4">Recent Activity</h2>
-            
             <div className="space-y-3">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center justify-between py-3 border-b border-white/[0.05] last:border-0">
+              {activities.map((a: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between py-3 border-b border-white/[0.05] last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      activity.type === 'deposit' ? 'bg-accent-mint/20' :
-                      activity.type === 'borrow' ? 'bg-accent-teal/20' :
-                      'bg-accent-yellow/20'
-                    }`}>
-                      {activity.type === 'deposit' ? (
-                        <ArrowLeft className="w-5 h-5 text-accent-mint rotate-180" />
-                      ) : activity.type === 'borrow' ? (
-                        <DollarSign className="w-5 h-5 text-accent-teal" />
-                      ) : (
-                        <Percent className="w-5 h-5 text-accent-yellow" />
-                      )}
+                    <div className={'w-10 h-10 rounded-full flex items-center justify-center bg-accent-mint/20'}>
+                      <DollarSign className="w-5 h-5 text-accent-mint" />
                     </div>
                     <div>
                       <p className="body-regular text-text-primary capitalize">
-                        {activity.type} {activity.asset}
+                        {String(a.kind).replace('_', ' ')} {String(a.token)}
                       </p>
                       <p className="body-tiny text-text-muted flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {activity.time}
+                        {new Date(Number(a.time) / 1_000_000).toLocaleString()}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="body-regular font-medium text-text-primary">
-                      {activity.type === 'deposit' ? '+' : '-'}{activity.amount} {activity.asset}
-                    </p>
-                    <p className={`body-tiny ${
-                      activity.status === 'completed' ? 'text-semantic-positive' : 'text-text-secondary'
-                    }`}>
-                      {activity.status}
+                      {(() => {
+                        const token = String(a.token);
+                        const decimals = token === 'ckBTC' ? 8 : token === 'ckUSDC' ? 6 : 0;
+                        const n = Number(a.amount) / Math.pow(10, decimals);
+                        return `${n.toFixed(decimals > 2 ? 4 : 2)} ${token}`;
+                      })()}
                     </p>
                   </div>
                 </div>
               ))}
+              {activities.length === 0 && (
+                <p className="body-small text-text-secondary">No recent activity</p>
+              )}
             </div>
           </motion.div>
         </div>
@@ -302,43 +277,33 @@ export function AccountOverview() {
               <Shield className="w-5 h-5 text-accent-mint" />
               <h3 className="heading-small text-text-primary">Position Health</h3>
             </div>
-            
             <div className="space-y-4">
-              {healthMetrics.map((metric) => (
-                <div key={metric.label} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="body-small text-text-secondary">{metric.label}</span>
-                    {getStatusIcon(metric.status)}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="body-regular font-semibold text-text-primary">
-                      {metric.value}
-                    </span>
-                    {metric.max && (
-                      <span className="body-tiny text-text-muted">Max: {metric.max}</span>
-                    )}
-                    {metric.min && (
-                      <span className="body-tiny text-text-muted">Min: {metric.min}</span>
-                    )}
-                    {metric.current && (
-                      <span className="body-tiny text-text-muted">Current: {metric.current}</span>
-                    )}
-                  </div>
-                  {metric.description && (
-                    <p className="body-tiny text-text-muted">{metric.description}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 p-4 bg-semantic-positive/10 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle className="w-4 h-4 text-semantic-positive" />
-                <p className="body-small font-medium text-text-primary">Position Status</p>
+              <div className="flex items-center justify-between">
+                <span className="body-small text-text-secondary">Collateral</span>
+                <span className="body-regular font-semibold text-text-primary">{collateralCkbtc.toFixed(8)} ckBTC</span>
               </div>
-              <p className="body-tiny text-text-secondary">
-                Your position is healthy with a comfortable safety margin
-              </p>
+              <div className="flex items-center justify-between">
+                <span className="body-small text-text-secondary">Debt</span>
+                <span className="body-regular font-semibold text-text-primary">${borrowUsd.toFixed(2)} ckUSDC</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="body-small text-text-secondary">Current LTV</span>
+                <span className="body-regular font-semibold text-text-primary">{(ltv * 100).toFixed(2)}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="body-small text-text-secondary">Max LTV</span>
+                <span className="body-regular font-semibold text-text-primary">{(maxLtv * 100).toFixed(0)}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="body-small text-text-secondary">Liquidation LTV</span>
+                <span className="body-regular font-semibold text-semantic-negative">{(liqLtv * 100).toFixed(0)}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="body-small text-text-secondary">Health Factor</span>
+                <span className={`body-regular font-semibold ${healthFactor && healthFactor > 1.2 ? 'text-semantic-positive' : 'text-semantic-warning'}`}>
+                  {healthFactor ? healthFactor.toFixed(2) : '—'}
+                </span>
+              </div>
             </div>
           </div>
 

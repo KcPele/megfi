@@ -20,10 +20,31 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/providers/auth-provider";
+import { useEffect, useState } from "react";
+import { useActors } from "@/hooks/useActors";
 
 export function Navbar() {
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, login, logout } = useAuth();
+  const { identity } = useAuth();
+  const { mainCanister } = useActors();
+  const [totalUsd, setTotalUsd] = useState<number | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const p = identity?.getPrincipal();
+        if (!p) return;
+        const res = await (mainCanister as any).getPortfolio(p);
+        if (res && typeof res.total_usd_e8s !== 'undefined') {
+          setTotalUsd(Number(res.total_usd_e8s) / 1e8);
+        }
+      } catch (e) {
+        console.error('Failed to load portfolio', e);
+      }
+    };
+    run();
+  }, [identity, mainCanister]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-white/[0.08]">
@@ -68,7 +89,7 @@ export function Navbar() {
               <Wallet className="w-4 h-4 text-text-muted" />
               <span className="body-small text-text-secondary">Balance:</span>
               <span className="body-regular font-semibold text-text-primary">
-                $30.00
+                {totalUsd === null ? '—' : `$${totalUsd.toFixed(2)}`}
               </span>
             </div>
 
@@ -119,7 +140,15 @@ export function Navbar() {
 
                 <DropdownMenuSeparator className="bg-white/[0.08]" />
 
-                {isAuthenticated && (
+                {!isAuthenticated ? (
+                  <DropdownMenuItem
+                    onSelect={login}
+                    className="text-accent-mint hover:bg-accent-mint/10"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    <span>Login</span>
+                  </DropdownMenuItem>
+                ) : (
                   <DropdownMenuItem
                     onSelect={logout}
                     className="text-semantic-negative hover:bg-semantic-negative/10"

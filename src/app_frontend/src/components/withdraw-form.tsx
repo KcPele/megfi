@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeDecimalInput, isValidEthAddress } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface WithdrawFormProps {
   symbol: string;
@@ -7,6 +8,14 @@ interface WithdrawFormProps {
 
 export function WithdrawForm({ symbol }: WithdrawFormProps) {
   const [percentage, setPercentage] = useState(100);
+  const [amount, setAmount] = useState("");
+  const [address, setAddress] = useState("");
+  const { toast } = useToast();
+  
+  const decimals = symbol.toLowerCase() === 'ckbtc' ? 8 : 6;
+  const isAmountValid = amount !== '' && Number(amount) > 0;
+  const isAddressValid = isValidEthAddress(address);
+  const canSubmit = isAmountValid && isAddressValid;
   
   const stats = [
     { label: 'Price', value: '16%' },
@@ -27,8 +36,29 @@ export function WithdrawForm({ symbol }: WithdrawFormProps) {
           <span>Balance: 8098.74</span>
           <span>Deposited: 189.10</span>
         </div>
-        <div className="flex justify-end items-center gap-2">
-          <span className="text-gray-400">{symbol}</span>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <input
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(sanitizeDecimalInput(e.target.value, decimals))}
+              placeholder={`0.${'0'.repeat(Math.min(4, decimals))}`}
+              className="flex-1 bg-transparent text-right text-2xl font-semibold text-white focus:outline-none"
+            />
+            <span className="text-gray-400">{symbol}</span>
+          </div>
+          <input
+            value={address}
+            onChange={(e) => setAddress(e.target.value.trim())}
+            placeholder="Recipient (0x...)"
+            className={cn(
+              "w-full bg-[#111226] text-white/90 rounded-xl px-4 py-3 text-sm focus:outline-none",
+              !isAddressValid && address.length > 0 && "ring-1 ring-red-500"
+            )}
+          />
+          {!isAddressValid && address.length > 0 && (
+            <span className="text-xs text-red-400">Enter a valid Ethereum address (0x...)</span>
+          )}
         </div>
       </div>
 
@@ -58,7 +88,20 @@ export function WithdrawForm({ symbol }: WithdrawFormProps) {
         ))}
       </div>
 
-      <button className="w-full bg-[#00A3FF] hover:bg-[#0093E9] text-white py-3.5 rounded-xl font-medium transition-colors text-lg">
+      <button
+        disabled={!canSubmit}
+        onClick={() => {
+          if (!canSubmit) {
+            toast({ title: 'Invalid withdrawal', description: !isAmountValid ? 'Enter an amount greater than 0' : 'Enter a valid 0x address' });
+            return;
+          }
+          toast({ title: 'Validated', description: `Withdrawing ${amount} ${symbol} to ${address}` });
+        }}
+        className={cn(
+          "w-full py-3.5 rounded-xl font-medium transition-colors text-lg",
+          canSubmit ? "bg-[#00A3FF] hover:bg-[#0093E9] text-white" : "bg-[#1A1B30]/60 text-gray-500 cursor-not-allowed"
+        )}
+      >
         Withdraw
       </button>
     </div>

@@ -7,11 +7,14 @@ import { Landing } from "@/components/landing";
 import { Settings } from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { DepositBTC } from "@/pages/deposit-btc";
-import { BorrowUSDC } from "@/pages/borrow-usdc";
+// import { BorrowUSDC } from "@/pages/borrow-usdc";
 import { RepayLoan } from "@/pages/repay-loan";
 import { AccountOverview } from "@/pages/account-overview";
 import { Layout } from "@/components/layout";
 import { Asset } from "@/pages/asset";
+import { SupplyCollateral } from "@/pages/supply-collateral";
+import { WithdrawCollateral } from "@/pages/withdraw-collateral";
+import { BorrowStable } from "@/pages/borrow-stable";
 
 function App() {
   return (
@@ -25,8 +28,13 @@ function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
             <Route path="/deposit" element={<DepositBTC />} />
-            <Route path="/borrow" element={<BorrowUSDC />} />
+            <Route path="/deposit-btc" element={<DepositBTC />} />
+            {/* Unify borrow onto protocol-based flow */}
+            <Route path="/borrow" element={<BorrowStable />} />
             <Route path="/repay" element={<RepayLoan />} />
+            <Route path="/supply" element={<SupplyCollateral />} />
+            <Route path="/withdraw" element={<WithdrawCollateral />} />
+            <Route path="/borrow-stable" element={<BorrowStable />} />
             <Route path="/account" element={<AccountOverview />} />
             <Route path="/asset" element={<Asset />} />
           </Route>

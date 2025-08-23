@@ -14,35 +14,59 @@ import {
   Loader2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { CKBTC_CANISTER_ID, CKBTC_ICP_CANISTER_ID, ICP_CANISTER_ID, MAIN_CANISTER_ID, useActors } from '@/hooks/useActors';
+import { useActors } from '@/hooks/useActors';
 import { useAuth } from '@/providers/auth-provider';
+import { useToast } from '@/hooks/use-toast';
 import { Principal } from '@dfinity/principal';
 import { principalToSubAccount } from '@dfinity/utils';
+import { sanitizeDecimalInput } from '@/lib/utils';
 
 export function BorrowUSDC() {
   const [amount, setAmount] = useState('');
   const [ckBTCBalance, setckBTCBalance] = useState(0n);
+  const [ckUSDCBalance, setCkUSDCBalance] = useState(0n);
   const [percentage, setPercentage] = useState(50);
   const [loading, setLoading] = useState(false);
   const [showRiskWarning, setShowRiskWarning] = useState(false);
+  const [approveBlockIndex, setApproveBlockIndex] = useState<bigint | null>(null);
+  const [swapReceived, setSwapReceived] = useState<bigint | null>(null);
+  const [transferBlockIndex, setTransferBlockIndex] = useState<bigint | null>(null);
   
   const { identity } = useAuth();
   const { ckbtcLedger, mainCanister, ckbtc_ckusdc, ckbtc_icp, icp, ckusdc } = useActors();
   const principal = identity?.getPrincipal();
   const subaccount = principalToSubAccount(principal!);
+  const { toast } = useToast();
 
   // Calculate loan details based on input
-  const btcPrice = 37500; // Mock price
+  const [btcPrice, setBtcPrice] = useState(0);
   const collateralValue = Number(amount || 0) * btcPrice;
-  const maxLTV = 0.7; // 70% LTV
+  const [maxLTV, setMaxLTV] = useState(0.7);
   const usdcToBorrow = collateralValue * (percentage / 100) * maxLTV;
-  const liquidationLTV = 0.85; // 85%
+  const [liquidationLTV, setLiquidationLTV] = useState(0.85);
   const liquidationPrice = (usdcToBorrow / (Number(amount || 1) * liquidationLTV));
-  const interestRate = 0.045; // 4.5% APR
+  const [interestRate, setInterestRate] = useState(0.045);
 
   const handleBorrow = async () => {
-    if (!principal || !amount) return;
-    
+    if (!principal) {
+      toast({ title: 'Not authenticated', description: 'Please sign in with Internet Identity.' });
+      return;
+    }
+    if (!amount || Number(amount) <= 0) {
+      toast({ title: 'Invalid amount', description: 'Enter a positive ckBTC amount.' });
+      return;
+    }
+    // Ensure user has enough ckBTC
+    const toNatWithDecimals = (val: string, decimals: number): bigint => {
+      const [whole, frac = ''] = val.split('.');
+      const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+      return BigInt(whole || '0') * BigInt(10) ** BigInt(decimals) + BigInt(fracPadded || '0');
+    };
+    const requested = toNatWithDecimals(amount, 8);
+    if (requested > ckBTCBalance) {
+      toast({ title: 'Insufficient ckBTC', description: 'Requested collateral exceeds your balance.' });
+      return;
+    }
     setShowRiskWarning(true);
   };
 
@@ -51,41 +75,91 @@ export function BorrowUSDC() {
     setShowRiskWarning(false);
     
     try {
-      // Your existing borrow logic here
-      const swapArgs = {
-        amountIn: amount,
-        zeroForOne: true,
-        amountOutMinimum: (usdcToBorrow * 0.99).toString() // 1% slippage
+      if (!principal) throw new Error('No principal');
+
+      // Convert ckBTC amount (string) -> satoshis (Nat64)
+      const toNatWithDecimals = (val: string, decimals: number): bigint => {
+        const [whole, frac = ''] = val.split('.');
+        const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+        return BigInt(whole || '0') * BigInt(10) ** BigInt(decimals) + BigInt(fracPadded || '0');
       };
 
-      // Simplified for demo - actual implementation would include all steps
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log("Borrow transaction completed");
-    } catch (error) {
+      const amountInSats = toNatWithDecimals(amount, 8);
+      // Min amount out (ckUSDC has 6 decimals); use 1% slippage on displayed USD
+      const minOut = BigInt(Math.floor(usdcToBorrow * 0.99 * 1e6));
+
+      // Approve
+      const approveRes = await mainCanister.approveSwap(amountInSats);
+      if ('Err' in approveRes) {
+        toast({ title: 'Approve failed', description: String(approveRes.Err) });
+        return;
+      }
+      setApproveBlockIndex(approveRes.Ok as unknown as bigint);
+      toast({ title: 'Approve succeeded', description: `Block index: ${String(approveRes.Ok)}` });
+
+      // Swap
+      const swapRes = await mainCanister.executeSwap(amountInSats, minOut);
+      if ('Err' in swapRes) {
+        toast({ title: 'Swap failed', description: String(swapRes.Err) });
+        return;
+      }
+      const out: bigint = swapRes.Ok as unknown as bigint;
+      setSwapReceived(out);
+      toast({ title: 'Swap succeeded', description: `Received ${(Number(out) / 1e6).toFixed(2)} ckUSDC` });
+
+      // Transfer
+      const transferRes = await mainCanister.transferUSDC(principal, out);
+      if ('Err' in transferRes) {
+        toast({ title: 'Transfer failed', description: String(transferRes.Err) });
+        return;
+      }
+      setTransferBlockIndex(transferRes.Ok as unknown as bigint);
+      toast({ title: 'Transfer succeeded', description: `Block index: ${String(transferRes.Ok)}` });
+
+      // Refresh balances
+      await fetchBalances();
+    } catch (error: any) {
       console.error('Error borrowing USDC:', error);
+      toast({ title: 'Error', description: error?.message || 'Unexpected error' });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    async function fetchBalance() {
-      if (!principal) return;
-      
-      try {
-        const balance = await ckbtcLedger.icrc1_balance_of({ 
-          owner: principal!, 
-          subaccount: [] 
-        });
-        setckBTCBalance(balance!);
-      } catch (error) {
-        console.error('Error fetching balance:', error);
-      }
-    }
+    fetchBalances();
+    loadConfigAndPrices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ckbtcLedger, ckusdc, principal]);
 
-    fetchBalance();
-  }, [ckbtcLedger, principal]);
+  async function fetchBalances() {
+    if (!principal) return;
+    try {
+      const [btcBal, usdcBal] = await Promise.all([
+        ckbtcLedger.icrc1_balance_of({ owner: principal!, subaccount: [] }),
+        ckusdc.icrc1_balance_of({ owner: principal!, subaccount: [] })
+      ]);
+      setckBTCBalance((btcBal || 0n) as bigint);
+      setCkUSDCBalance((usdcBal || 0n) as bigint);
+    } catch (e) {
+      console.error('Error fetching balances:', e);
+    }
+  }
+
+  async function loadConfigAndPrices() {
+    try {
+      const [cfg, prices] = await Promise.all([
+        (mainCanister as any).getProtocolConfig(),
+        (mainCanister as any).getPrices(),
+      ]);
+      setMaxLTV(Number(cfg.maxLTVBps) / 10000);
+      setLiquidationLTV(Number(cfg.liquidationLTVBps) / 10000);
+      setInterestRate(Number(cfg.interestRateBps) / 10000);
+      setBtcPrice(Number(prices.btc_usd_e8s) / 1e8);
+    } catch (e) {
+      console.error('Failed to load config/prices', e);
+    }
+  }
 
   return (
     <motion.div
@@ -129,9 +203,9 @@ export function BorrowUSDC() {
                     </div>
                   </div>
                   <input
-                    type="number"
+                    inputMode="decimal"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => setAmount(sanitizeDecimalInput(e.target.value, 8))}
                     placeholder="0.0000"
                     className="bg-transparent text-right text-2xl font-semibold text-text-primary focus:outline-none w-40"
                   />
@@ -250,6 +324,31 @@ export function BorrowUSDC() {
                 <span>Borrow USDC</span>
               )}
             </button>
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={fetchBalances}
+                className="px-3 py-2 rounded-lg bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-white/10 text-sm"
+              >
+                Refresh Balances
+              </button>
+            </div>
+            {/* Transaction Summary */}
+            {!!(approveBlockIndex || swapReceived || transferBlockIndex) && (
+              <div className="mt-6 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Approve Block</span>
+                  <span className="text-text-primary">{approveBlockIndex ? String(approveBlockIndex) : '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Swap Received</span>
+                  <span className="text-text-primary">{swapReceived ? (Number(swapReceived) / 1e6).toFixed(2) : '-'} ckUSDC</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Transfer Block</span>
+                  <span className="text-text-primary">{transferBlockIndex ? String(transferBlockIndex) : '-'}</span>
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* Risk Warning */}
@@ -284,6 +383,12 @@ export function BorrowUSDC() {
           <div className="card-container">
             <h4 className="heading-small text-text-primary mb-4">Key Metrics</h4>
             <div className="space-y-4">
+              <div className="card-mini">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="body-tiny text-text-muted">ckUSDC Balance</span>
+                </div>
+                <p className="body-regular font-semibold text-text-primary">{(Number(ckUSDCBalance) / 1e6).toFixed(2)} ckUSDC</p>
+              </div>
               <div className="card-mini">
                 <div className="flex items-center justify-between mb-1">
                   <span className="body-tiny text-text-muted">Max LTV</span>

@@ -9,7 +9,10 @@
     "prebuild": "npm run prebuild --workspaces --if-present",
     "pretest": "npm run prebuild --workspaces --if-present",
     "start": "npm start --workspaces --if-present",
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "deploy:ic:backend": "dfx deploy app_backend --network ic --argument '(opt record { btcMinter = principal \"mqygn-kiaaa-aaaar-qaadq-cai\"; ethMinter = principal \"sv3dd-oaaaa-aaaar-qacoa-cai\"; ckBTCckUSDCPair = principal \"mhecj-xyaaa-aaaag-qjyjq-cai\"; ckUSDCLedger = principal \"xevnm-gaaaa-aaaar-qafnq-cai\"; ckBTCLedger = principal \"mxzaz-hqaaa-aaaar-qaada-cai\" })'",
+    "deploy:ic:frontend": "npm --workspace src/app_frontend run build:ic && dfx deploy app_frontend --network ic",
+    "deploy:ic": "npm run deploy:ic:backend && npm run deploy:ic:frontend"
   },
   "type": "module",
   "workspaces": [
