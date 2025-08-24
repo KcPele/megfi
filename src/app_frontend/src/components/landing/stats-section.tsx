@@ -11,36 +11,36 @@ export function StatsSection() {
   const stats = [
     {
       icon: DollarSign,
-      value: "$2.4M",
+      value: "$200",
       label: "Total Value Locked",
       change: "+15.2%",
-      isPositive: true
+      isPositive: true,
     },
     {
       icon: TrendingUp,
       value: "4.5%",
       label: "Average APY",
       change: "Variable",
-      isPositive: null
+      isPositive: null,
     },
     {
       icon: Users,
-      value: "1,250+",
+      value: "15+",
       label: "Active Users",
       change: "+8.7%",
-      isPositive: true
+      isPositive: true,
     },
     {
       icon: Activity,
-      value: "$120K",
+      value: "$120",
       label: "24h Volume",
       change: "+23.1%",
-      isPositive: true
-    }
+      isPositive: true,
+    },
   ];
 
   return (
-    <motion.section 
+    <motion.section
       initial="initial"
       whileInView="animate"
       viewport={{ once: true, margin: "-100px" }}
@@ -57,7 +57,7 @@ export function StatsSection() {
             </p>
           </div>
 
-          <motion.div 
+          <motion.div
             variants={{
               animate: {
                 transition: {
@@ -76,22 +76,24 @@ export function StatsSection() {
                 <div className="w-12 h-12 bg-accent-mint/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <stat.icon className="w-6 h-6 text-accent-mint" />
                 </div>
-                
+
                 <div className="heading-large text-text-primary mb-1">
                   {stat.value}
                 </div>
-                
+
                 <div className="body-small text-text-muted mb-2">
                   {stat.label}
                 </div>
-                
-                <div className={`body-tiny px-2 py-1 rounded-lg ${
-                  stat.isPositive === true 
-                    ? 'text-semantic-positive bg-semantic-positive/10' 
-                    : stat.isPositive === false 
-                    ? 'text-semantic-negative bg-semantic-negative/10'
-                    : 'text-text-secondary bg-white/5'
-                }`}>
+
+                <div
+                  className={`body-tiny px-2 py-1 rounded-lg ${
+                    stat.isPositive === true
+                      ? "text-semantic-positive bg-semantic-positive/10"
+                      : stat.isPositive === false
+                      ? "text-semantic-negative bg-semantic-negative/10"
+                      : "text-text-secondary bg-white/5"
+                  }`}
+                >
                   {stat.change}
                 </div>
               </motion.div>

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { 
   User, 
   Shield, 
@@ -20,8 +20,78 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/providers/auth-provider";
+import { useActors } from "@/hooks/useActors";
+
+function formatDate(ms: number) {
+  try {
+    return new Date(ms).toLocaleString();
+  } catch {
+    return "—";
+  }
+}
 
 export function Settings() {
+  const { identity, isAuthenticated } = useAuth();
+  const principalText = identity?.getPrincipal().toText() ?? "Not signed in";
+  const { mainCanister } = useActors();
+
+  const [btcAddress, setBtcAddress] = useState<string>("");
+  const [loadingAddr, setLoadingAddr] = useState(false);
+  const [activityStats, setActivityStats] = useState({
+    total: 0,
+    last: "—",
+    ageDays: "—",
+  });
+  const [portfolio, setPortfolio] = useState<{ ckbtc: bigint; ckusdc: bigint; total_usd_e8s: bigint } | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!identity) return;
+      try {
+        setLoadingAddr(true);
+        // BTC deposit address (per principal)
+        const addr = await (mainCanister as any).getBtcAddress([identity.getPrincipal()], []);
+        setBtcAddress(addr || "");
+      } catch (e) {
+        setBtcAddress("");
+      } finally {
+        setLoadingAddr(false);
+      }
+
+      try {
+        // Activity for stats
+        const acts = await (mainCanister as any).getActivity(identity.getPrincipal());
+        const total = Array.isArray(acts) ? acts.length : 0;
+        let last = "—";
+        let ageDays = "—";
+        if (total > 0) {
+          // activities are prepended newest-first in backend
+          const newest = acts[0];
+          const oldest = acts[acts.length - 1];
+          const newestMs = Number(newest.time) / 1_000_000;
+          const oldestMs = Number(oldest.time) / 1_000_000;
+          last = formatDate(newestMs);
+          const days = Math.max(0, Math.floor((Date.now() - oldestMs) / (1000 * 60 * 60 * 24)));
+          ageDays = `${days} day${days === 1 ? "" : "s"}`;
+        }
+        setActivityStats({ total, last, ageDays });
+      } catch {
+        setActivityStats({ total: 0, last: "—", ageDays: "—" });
+      }
+
+      try {
+        const p = await (mainCanister as any).getPortfolio(identity.getPrincipal());
+        setPortfolio(p);
+      } catch {}
+    };
+    load();
+  }, [identity, mainCanister]);
+
+  const usdFormatted = useMemo(() => {
+    if (!portfolio) return "—";
+    return `$${(Number(portfolio.total_usd_e8s) / 1e8).toFixed(2)}`;
+  }, [portfolio]);
   const [notifications, setNotifications] = useState({
     deposits: true,
     borrows: true,
@@ -97,39 +167,49 @@ export function Settings() {
               </div>
 
               <div className="space-y-6">
-                {/* Internet Identity */}
+                {/* Internet Identity / Principal */}
                 <div>
                   <Label className="body-small text-text-secondary mb-2 block">
-                    Internet Identity
+                    Principal (Internet Identity)
                   </Label>
                   <div className="flex items-center justify-between p-4 bg-white/[0.02] rounded-xl border border-white/[0.05]">
                     <div>
                       <p className="body-regular text-text-primary font-mono">
-                        rdmx6-jaaaa-aaaaa-aaadq-cai
+                        {principalText}
                       </p>
                       <p className="body-tiny text-text-muted">
-                        Connected via Internet Identity
+                        {isAuthenticated ? "Connected via Internet Identity" : "Not signed in"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-semantic-positive" />
-                      <span className="body-tiny text-semantic-positive">Verified</span>
+                      {isAuthenticated ? (
+                        <>
+                          <Check className="w-4 h-4 text-semantic-positive" />
+                          <span className="body-tiny text-semantic-positive">Verified</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-4 h-4 text-semantic-negative" />
+                          <span className="body-tiny text-semantic-negative">Disconnected</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Wallet Address */}
+                {/* BTC Deposit Address */}
                 <div>
                   <Label className="body-small text-text-secondary mb-2 block">
-                    Wallet Address
+                    BTC Deposit Address
                   </Label>
                   <div className="flex items-center gap-3">
-                    <Input 
-                      value="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
-                      readOnly
-                      className="font-mono"
-                    />
-                    <Button variant="outline" size="sm">
+                    <Input value={loadingAddr ? "Loading..." : btcAddress || "—"} readOnly className="font-mono" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => btcAddress && navigator.clipboard.writeText(btcAddress)}
+                      disabled={!btcAddress}
+                    >
                       Copy
                     </Button>
                   </div>
@@ -139,15 +219,35 @@ export function Settings() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="card-mini">
                     <p className="body-tiny text-text-muted mb-1">Account Age</p>
-                    <p className="body-regular font-semibold text-text-primary">14 days</p>
+                    <p className="body-regular font-semibold text-text-primary">{activityStats.ageDays}</p>
                   </div>
                   <div className="card-mini">
                     <p className="body-tiny text-text-muted mb-1">Total Transactions</p>
-                    <p className="body-regular font-semibold text-text-primary">23</p>
+                    <p className="body-regular font-semibold text-text-primary">{activityStats.total}</p>
                   </div>
                   <div className="card-mini">
                     <p className="body-tiny text-text-muted mb-1">Last Activity</p>
-                    <p className="body-regular font-semibold text-text-primary">2h ago</p>
+                    <p className="body-regular font-semibold text-text-primary">{activityStats.last}</p>
+                  </div>
+                </div>
+
+                {/* Portfolio Snapshot */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="card-mini">
+                    <p className="body-tiny text-text-muted mb-1">ckBTC</p>
+                    <p className="body-regular font-semibold text-text-primary">
+                      {portfolio ? (Number(portfolio.ckbtc) / 1e8).toFixed(8) : "—"}
+                    </p>
+                  </div>
+                  <div className="card-mini">
+                    <p className="body-tiny text-text-muted mb-1">ckUSDC</p>
+                    <p className="body-regular font-semibold text-text-primary">
+                      {portfolio ? (Number(portfolio.ckusdc) / 1e6).toFixed(2) : "—"}
+                    </p>
+                  </div>
+                  <div className="card-mini">
+                    <p className="body-tiny text-text-muted mb-1">Total (USD)</p>
+                    <p className="body-regular font-semibold text-text-primary">{usdFormatted}</p>
                   </div>
                 </div>
               </div>
