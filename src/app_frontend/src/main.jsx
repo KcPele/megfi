@@ -6,6 +6,7 @@ import { AuthProvider } from "@/providers/auth-provider";
 import { Gate } from "@/components/gate";
 import App from './App';
 import './index.css';
+import { Toaster } from "@/components/ui/toaster";
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Gate>
             <App />
           </Gate>
+          <Toaster />
         </BrowserRouter>
       </ThemeProvider>
     </AuthProvider>

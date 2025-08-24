@@ -1,16 +1,54 @@
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Info } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useActors } from "@/hooks/useActors";
+import { useAuth } from "@/providers/auth-provider";
 
 interface AssetBalanceProps {
   symbol: string;
 }
 
 export function AssetBalance({ symbol }: AssetBalanceProps) {
-  // Mock data - in real app, this would come from props or API
-  const balance = 8098.74;
-  const usdValue = 324589.32;
-  const change24h = 2.45;
-  const isPositive = change24h > 0;
+  const { mainCanister } = useActors();
+  const { identity } = useAuth();
+  const [balance, setBalance] = useState(0);
+  const [usdValue, setUsdValue] = useState(0);
+  const [locked, setLocked] = useState(0);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!identity) return;
+        const principal = identity.getPrincipal();
+        const portfolio = await (mainCanister as any).getPortfolio(principal);
+        const prices = await (mainCanister as any).getPrices();
+
+        if (symbol === "USDC") {
+          const amt = Number(portfolio.ckusdc || 0) / 1e6;
+          setBalance(amt);
+          const price = Number(prices.usdc_usd_e6s || 1_000_000) / 1e6;
+          setUsdValue(amt * price);
+          setLocked(0);
+        } else {
+          // default to ckBTC
+          const amt = Number(portfolio.ckbtc || 0) / 1e8;
+          setBalance(amt);
+          const price = Number(prices.btc_usd_e8s || 0) / 1e8;
+          setUsdValue(amt * price);
+          try {
+            const pos = await (mainCanister as any).getPosition();
+            setLocked(Number(pos?.collateral_ckbtc || 0) / 1e8);
+          } catch {}
+        }
+      } catch (e) {
+        console.error("Failed to load asset balance", e);
+      }
+    };
+    run();
+  }, [identity, mainCanister, symbol]);
+
+  const change24h: number | null = null; // not provided by backend yet
+  const isPositive = (change24h ?? 0) > 0;
 
   return (
     <motion.div
@@ -28,18 +66,20 @@ export function AssetBalance({ symbol }: AssetBalanceProps) {
           <p className="text-xl text-muted-foreground">
             ${usdValue.toLocaleString()}
           </p>
-          <div
-            className={`flex items-center gap-1 text-sm font-medium ${
-              isPositive ? "text-accent-mint" : "text-accent-pink"
-            }`}
-          >
-            {isPositive ? (
-              <TrendingUp className="w-4 h-4" />
-            ) : (
-              <TrendingDown className="w-4 h-4" />
-            )}
-            <span>{Math.abs(change24h)}%</span>
-          </div>
+          {change24h === null ? null : (
+            <div
+              className={`flex items-center gap-1 text-sm font-medium ${
+                isPositive ? "text-accent-mint" : "text-accent-pink"
+              }`}
+            >
+              {isPositive ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+              <span>{Math.abs(change24h)}%</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -59,7 +99,7 @@ export function AssetBalance({ symbol }: AssetBalanceProps) {
         <div className="h-12 w-px bg-accent-mint/20" />
         <div className="text-left">
           <p className="text-sm text-muted-foreground mb-1">Locked</p>
-          <p className="text-2xl font-semibold">0.00</p>
+          <p className="text-2xl font-semibold">{locked.toLocaleString()}</p>
         </div>
         <div className="relative group">
           <Info className="w-4 h-4 text-muted-foreground cursor-help" />

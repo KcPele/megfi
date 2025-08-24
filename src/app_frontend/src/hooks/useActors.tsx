@@ -12,6 +12,7 @@ import {
   idlFactory as icpIdlFactory,
 } from "@/../../declarations/icp";
 import { Actor, HttpAgent } from "@dfinity/agent";
+import { Principal } from "@dfinity/principal";
 import {
   idlFactory as ckbtc_ckUsdc_idlFactory,
   ckbtc_ckusdc as ckbtc_ckUsdc_canister,
@@ -20,26 +21,44 @@ import {
   idlFactory as ckusdc_idlFactory,
   ckusdc as ckusdc_canister,
 } from "@/../../declarations/ckusdc";
-import {
-  idlFactory as ckbtc_icp_idlFactory,
-  ckbtc_icp as ckbtc_icp_canister,
-} from "@/../../declarations/ckbtc_icp";
+
 import { useAuth } from "@/providers/auth-provider";
+import { idlFactory as btcMinterIdlFactory } from "@/../../declarations/mock_btc_minter";
+import { CkETHMinterCanister } from "@dfinity/cketh";
 
 export const HOST =
   process.env.DFX_NETWORK === "local"
     ? "http://localhost:4943"
-    : typeof window !== "undefined"
+    : typeof window !== "undefined" &&
+      (window.location.hostname.endsWith(".icp0.io") ||
+        window.location.hostname.endsWith(".ic0.app"))
     ? window.location.origin
     : "https://icp0.io";
 
-// Canister IDs (from environment)
+// Canister IDs (force mainnet IDs when DFX_NETWORK === "ic")
 const MAIN_CANISTER_ID = process.env.CANISTER_ID_APP_BACKEND as string;
-const CKBTC_LEDGER_CANISTER_ID = process.env.CANISTER_ID_CKBTC_LEDGER as string;
+const CKBTC_LEDGER_CANISTER_ID =
+  process.env.DFX_NETWORK === "ic"
+    ? "mxzaz-hqaaa-aaaar-qaada-cai" // Official mainnet ckBTC Ledger
+    : (process.env.CANISTER_ID_CKBTC_LEDGER as string);
 const CKBTC_CKUSDC_CANISTER_ID = process.env.CANISTER_ID_CKBTC_CKUSDC as string;
-const CKBTC_ICP_CANISTER_ID = process.env.CANISTER_ID_CKBTC_ICP as string;
-const ICP_CANISTER_ID = process.env.CANISTER_ID_ICP as string;
-const CKUSDC_CANISTER_ID = process.env.CANISTER_ID_CKUSDC as string;
+const ICP_CANISTER_ID =
+  process.env.DFX_NETWORK === "ic"
+    ? "ryjl3-tyaaa-aaaaa-aaaba-cai" // Official mainnet ICP Ledger
+    : (process.env.CANISTER_ID_ICP as string);
+const CKUSDC_CANISTER_ID =
+  process.env.DFX_NETWORK === "ic"
+    ? "xevnm-gaaaa-aaaar-qafnq-cai" // Official mainnet ckUSDC Ledger
+    : (process.env.CANISTER_ID_CKUSDC as string);
+const CKBTC_MINTER_CANISTER_ID =
+  (process.env.CANISTER_ID_CKBTC_MINTER as string) ||
+  (process.env.CANISTER_ID_MOCK_BTC_MINTER as string);
+const CKETH_MINTER_CANISTER_ID =
+  (process.env.CANISTER_ID_CKETH_MINTER as string) ||
+  // default to mainnet ckETH minter if not provided
+  (process.env.DFX_NETWORK === "ic"
+    ? "sv3dd-oaaaa-aaaar-qacoa-cai"
+    : undefined);
 
 // Create agents with local development support
 const createAgent = () => {
@@ -63,10 +82,7 @@ export const CKBTC_CKUSDC: typeof ckbtc_ckUsdc_canister = Actor.createActor(
   ckbtc_ckUsdc_idlFactory,
   { agent: createAgent(), canisterId: CKBTC_CKUSDC_CANISTER_ID }
 );
-export const CKBTC_ICP: typeof ckbtc_icp_canister = Actor.createActor(
-  ckbtc_icp_idlFactory,
-  { agent: createAgent(), canisterId: CKBTC_ICP_CANISTER_ID }
-);
+
 export const ICP: typeof icpCanister = Actor.createActor(icpIdlFactory, {
   agent: createAgent(),
   canisterId: ICP_CANISTER_ID,
@@ -75,9 +91,20 @@ export const CKUSDC: typeof ckusdc_canister = Actor.createActor(
   ckusdc_idlFactory,
   { agent: createAgent(), canisterId: CKUSDC_CANISTER_ID }
 );
+export const CKBTC_MINTER = Actor.createActor(btcMinterIdlFactory as any, {
+  agent: createAgent(),
+  canisterId: CKBTC_MINTER_CANISTER_ID,
+});
+export const CKETH_MINTER = CKETH_MINTER_CANISTER_ID
+  ? CkETHMinterCanister.create({
+      agent: createAgent() as any,
+      canisterId: Principal.fromText(CKETH_MINTER_CANISTER_ID),
+    })
+  : null;
 
 export const useActors = () => {
   const { identity } = useAuth();
+
   // actors in state
   const [mainCanister, setMainCanister] =
     useState<typeof app_backend>(MAIN_CANISTER);
@@ -85,11 +112,11 @@ export const useActors = () => {
     useState<typeof icrc1_ledger_canister>(CKBTC_LEDGER);
   const [ckbtc_ckusdc, setCkbtc_ckusdc] =
     useState<typeof ckbtc_ckUsdc_canister>(CKBTC_CKUSDC);
-  const [ckbtc_icp, setCkbtc_icp] = useState<typeof ckbtc_icp_canister | null>(
-    CKBTC_ICP
-  );
+
   const [icp, setIcp] = useState<typeof icpCanister>(ICP);
   const [ckusdc, setCkusdc] = useState<typeof ckusdc_canister>(CKUSDC);
+  const [ckbtcMinter, setCkbtcMinter] = useState<any>(CKBTC_MINTER);
+  const [ckethMinter, setCkethMinter] = useState<any>(CKETH_MINTER);
 
   useEffect(() => {
     if (!identity) return;
@@ -112,10 +139,7 @@ export const useActors = () => {
       ckbtc_ckUsdc_idlFactory,
       { agent, canisterId: CKBTC_CKUSDC_CANISTER_ID }
     );
-    const _ckbtc_icp: typeof ckbtc_icp_canister = Actor.createActor(
-      ckbtc_icp_idlFactory,
-      { agent, canisterId: CKBTC_ICP_CANISTER_ID }
-    );
+
     const _icp: typeof icpCanister = Actor.createActor(icpIdlFactory, {
       agent,
       canisterId: ICP_CANISTER_ID,
@@ -124,15 +148,34 @@ export const useActors = () => {
       ckusdc_idlFactory,
       { agent, canisterId: CKUSDC_CANISTER_ID }
     );
+    const _ckbtcMinter = Actor.createActor(btcMinterIdlFactory as any, {
+      agent,
+      canisterId: CKBTC_MINTER_CANISTER_ID,
+    });
+    const _ckethMinter = CKETH_MINTER_CANISTER_ID
+      ? CkETHMinterCanister.create({
+          agent: agent as any,
+          canisterId: Principal.fromText(CKETH_MINTER_CANISTER_ID),
+        })
+      : null;
 
     // set actors
     setMainCanister(_mainCanisterActor);
     setCkbtcLedger(_ckbtcLedgerActor);
     setCkbtc_ckusdc(_ckbtc_ckusdc);
-    setCkbtc_icp(_ckbtc_icp);
     setIcp(_icp);
     setCkusdc(_ckusdc);
+    setCkbtcMinter(_ckbtcMinter);
+    setCkethMinter(_ckethMinter);
   }, [identity]);
 
-  return { mainCanister, ckbtcLedger, ckbtc_ckusdc, ckbtc_icp, icp, ckusdc };
+  return {
+    mainCanister,
+    ckbtcLedger,
+    ckbtc_ckusdc,
+    icp,
+    ckusdc,
+    ckbtcMinter,
+    ckethMinter,
+  };
 };

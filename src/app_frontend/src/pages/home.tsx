@@ -5,13 +5,11 @@ import { useAuth } from "@/providers/auth-provider";
 import { Link } from "react-router-dom";
 import {
   Wallet,
-  TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
   Bitcoin,
   DollarSign,
   Activity,
-  PieChart,
 } from "lucide-react";
 
 export function Home() {

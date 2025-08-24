@@ -7,7 +7,7 @@ import { Landing } from "@/components/landing";
 import { Settings } from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { DepositBTC } from "@/pages/deposit-btc";
-// import { BorrowUSDC } from "@/pages/borrow-usdc";
+import { BorrowUSDC } from "@/pages/borrow-usdc";
 import { RepayLoan } from "@/pages/repay-loan";
 import { AccountOverview } from "@/pages/account-overview";
 import { Layout } from "@/components/layout";
@@ -34,7 +34,7 @@ function App() {
             <Route path="/repay" element={<RepayLoan />} />
             <Route path="/supply" element={<SupplyCollateral />} />
             <Route path="/withdraw" element={<WithdrawCollateral />} />
-            <Route path="/borrow-stable" element={<BorrowStable />} />
+            <Route path="/borrow-stable" element={<BorrowUSDC />} />
             <Route path="/account" element={<AccountOverview />} />
             <Route path="/asset" element={<Asset />} />
           </Route>

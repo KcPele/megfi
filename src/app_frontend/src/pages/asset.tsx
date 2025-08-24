@@ -36,69 +36,57 @@ export function Asset() {
   const [dynPrice, setDynPrice] = useState<number | null>(null);
   const [liqThreshold, setLiqThreshold] = useState<number | null>(null);
   const [maxLtv, setMaxLtv] = useState<number | null>(null);
+  const [tvlUsd, setTvlUsd] = useState<number | null>(null);
+  const [borrowUsd, setBorrowUsd] = useState<number | null>(null);
+  const [utilizationPct, setUtilizationPct] = useState<number | null>(null);
 
   useEffect(() => {
     const run = async () => {
       try {
-        const [prices, cfg] = await Promise.all([
+        const [prices, cfg, stats] = await Promise.all([
           (mainCanister as any).getPrices(),
           (mainCanister as any).getProtocolConfig(),
+          (mainCanister as any).getProtocolStats(),
         ]);
-        const p = symbol === 'USDC'
-          ? Number(prices.usdc_usd_e6s) / 1e6
-          : Number(prices.btc_usd_e8s) / 1e8;
+        const p =
+          symbol === "USDC"
+            ? Number(prices.usdc_usd_e6s) / 1e6
+            : Number(prices.btc_usd_e8s) / 1e8;
         setDynPrice(p);
         setLiqThreshold(Number(cfg.liquidationLTVBps) / 100);
         setMaxLtv(Number(cfg.maxLTVBps) / 100);
+        setTvlUsd(Number(stats.tvl_usd_e8s) / 1e8);
+        setBorrowUsd(Number(stats.total_borrow_usd_e8s) / 1e8);
+        setUtilizationPct(Number(stats.utilization_bps) / 100);
       } catch (e) {
-        console.error('Failed to load asset details', e);
+        console.error("Failed to load asset details", e);
       }
     };
     run();
   }, [mainCanister, symbol]);
 
-  // Mock data based on symbol
-  const assetData = {
-    ckBTC: {
-      name: "Chain Key Bitcoin",
-      icon: Bitcoin,
-      colorClass: "text-accent-yellow",
-      bgColorClass: "bg-accent-yellow",
-      price: 37500,
-      apy: 2.5,
-      borrowApy: 5.2,
-      balance: 0.0008,
-      value: 30.0,
-      change24h: 12.5,
-      totalSupply: 2400000,
-      totalBorrowed: 1200000,
-      utilizationRate: 50,
-      reserveFactor: 10,
-      liquidationThreshold: 75,
-      liquidationPenalty: 5,
-    },
-    USDC: {
-      name: "USD Coin",
-      icon: DollarSign,
-      colorClass: "text-accent-teal",
-      bgColorClass: "bg-accent-teal",
-      price: 1.0,
-      apy: 4.5,
-      borrowApy: 7.8,
-      balance: 21.0,
-      value: 21.0,
-      change24h: 0.0,
-      totalSupply: 5000000,
-      totalBorrowed: 3500000,
-      utilizationRate: 70,
-      reserveFactor: 10,
-      liquidationThreshold: 85,
-      liquidationPenalty: 5,
-    },
+  // Static metadata per asset (icon/colors/name)
+  const meta = (
+    {
+      ckBTC: {
+        name: "Chain Key Bitcoin",
+        icon: Bitcoin,
+        colorClass: "text-accent-yellow",
+        bgColorClass: "bg-accent-yellow",
+      },
+      USDC: {
+        name: "USD Coin",
+        icon: DollarSign,
+        colorClass: "text-accent-teal",
+        bgColorClass: "bg-accent-teal",
+      },
+    } as const
+  )[symbol as "ckBTC" | "USDC"] || {
+    name: "Chain Key Bitcoin",
+    icon: Bitcoin,
+    colorClass: "text-accent-yellow",
+    bgColorClass: "bg-accent-yellow",
   };
-
-  const asset = assetData[symbol as keyof typeof assetData] || assetData.ckBTC;
-  const isPositiveChange = asset.change24h > 0;
 
   return (
     <motion.div
@@ -127,32 +115,22 @@ export function Asset() {
           className="flex items-center gap-4 mb-8"
         >
           <div
-            className={`w-16 h-16 ${asset.bgColorClass}/10 rounded-2xl flex items-center justify-center`}
+            className={`w-16 h-16 ${meta.bgColorClass}/10 rounded-2xl flex items-center justify-center`}
           >
-            <asset.icon className={`w-8 h-8 ${asset.colorClass}`} />
+            <meta.icon className={`w-8 h-8 ${meta.colorClass}`} />
           </div>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold">{asset.name}</h1>
+            <h1 className="text-3xl font-bold">{meta.name}</h1>
             <div className="flex items-center gap-4 mt-2">
               <span className="text-lg text-muted-foreground">{symbol}</span>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-medium">${(dynPrice ?? asset.price).toLocaleString()}</span>
-                <div
-                  className={`flex items-center gap-1 text-sm font-medium ${
-                    isPositiveChange
-                      ? "text-accent-mint"
-                      : asset.change24h < 0
-                      ? "text-accent-pink"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {isPositiveChange ? (
-                    <TrendingUp className="w-4 h-4" />
-                  ) : asset.change24h < 0 ? (
-                    <TrendingDown className="w-4 h-4" />
-                  ) : null}
-                  <span>{Math.abs(asset.change24h)}%</span>
-                </div>
+                <span className="text-lg font-medium">
+                  {(dynPrice ?? 0).toLocaleString(undefined, {
+                    minimumFractionDigits: symbol === "USDC" ? 2 : 0,
+                    maximumFractionDigits: symbol === "USDC" ? 2 : 0,
+                  })}
+                </span>
+                {/* 24h change: not available from backend yet */}
               </div>
             </div>
           </div>
@@ -199,7 +177,9 @@ export function Asset() {
                         <span className="text-sm text-muted-foreground">
                           Supply APY
                         </span>
-                        <span className="text-sm font-medium text-accent-mint">—</span>
+                        <span className="text-sm font-medium text-accent-mint">
+                          —
+                        </span>
                       </div>
                       <Progress value={0} className="h-2" />
                     </div>
@@ -208,7 +188,9 @@ export function Asset() {
                         <span className="text-sm text-muted-foreground">
                           Borrow APY
                         </span>
-                        <span className="text-sm font-medium text-accent-pink">—</span>
+                        <span className="text-sm font-medium text-accent-pink">
+                          —
+                        </span>
                       </div>
                       <Progress value={0} className="h-2" />
                     </div>
@@ -218,13 +200,25 @@ export function Asset() {
                       <span className="text-sm text-muted-foreground">
                         Total Supply
                       </span>
-                      <span className="text-sm font-medium">—</span>
+                      <span className="text-sm font-medium">
+                        {tvlUsd !== null
+                          ? `$${tvlUsd.toLocaleString(undefined, {
+                              maximumFractionDigits: 0,
+                            })}`
+                          : "—"}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center p-3 rounded-lg bg-bg-secondary/50">
                       <span className="text-sm text-muted-foreground">
                         Total Borrowed
                       </span>
-                      <span className="text-sm font-medium">—</span>
+                      <span className="text-sm font-medium">
+                        {borrowUsd !== null
+                          ? `$${borrowUsd.toLocaleString(undefined, {
+                              maximumFractionDigits: 0,
+                            })}`
+                          : "—"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -232,11 +226,21 @@ export function Asset() {
                 {/* Utilization Rate */}
                 <div className="mt-6 p-4 rounded-lg bg-bg-secondary/50">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">Utilization Rate</span>
-                    <span className="text-sm font-medium">—</span>
+                    <span className="text-sm font-medium">
+                      Utilization Rate
+                    </span>
+                    <span className="text-sm font-medium">
+                      {utilizationPct !== null
+                        ? `${utilizationPct.toFixed(2)}%`
+                        : "—"}
+                    </span>
                   </div>
-                  <Progress value={0} className="h-3" />
-                  <p className="text-xs text-muted-foreground mt-2">—</p>
+                  <Progress value={utilizationPct ?? 0} className="h-3" />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {utilizationPct !== null
+                      ? `${utilizationPct.toFixed(2)}% utilized`
+                      : "—"}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -272,7 +276,11 @@ export function Asset() {
                       Liquidation Threshold
                     </span>
                   </div>
-                  <span className="text-sm font-medium">{liqThreshold !== null ? `${liqThreshold.toFixed(0)}%` : '—'}</span>
+                  <span className="text-sm font-medium">
+                    {liqThreshold !== null
+                      ? `${liqThreshold.toFixed(0)}%`
+                      : "—"}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-lg bg-bg-secondary/50">
                   <div className="flex items-center gap-2">
@@ -281,7 +289,9 @@ export function Asset() {
                       Max LTV
                     </span>
                   </div>
-                  <span className="text-sm font-medium">{maxLtv !== null ? `${maxLtv.toFixed(0)}%` : '—'}</span>
+                  <span className="text-sm font-medium">
+                    {maxLtv !== null ? `${maxLtv.toFixed(0)}%` : "—"}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-lg bg-bg-secondary/50">
                   <div className="flex items-center gap-2">
@@ -290,7 +300,9 @@ export function Asset() {
                       Liquidation Penalty
                     </span>
                   </div>
-                  <span className="text-sm font-medium text-accent-pink">—</span>
+                  <span className="text-sm font-medium text-accent-pink">
+                    —
+                  </span>
                 </div>
                 <div className="mt-4 p-3 rounded-lg bg-accent-yellow/10 border border-accent-yellow/20">
                   <p className="text-xs text-accent-yellow">

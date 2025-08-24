@@ -1,22 +1,22 @@
 "use client";
 
-import { motion } from 'framer-motion';
-import { 
-  Bitcoin, 
-  DollarSign, 
-  TrendingUp, 
-  Shield, 
+import { motion } from "framer-motion";
+import {
+  Bitcoin,
+  DollarSign,
+  TrendingUp,
+  Shield,
   ArrowLeft,
   Clock,
   AlertCircle,
   CheckCircle,
-  XCircle
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
-import { useActors } from '@/hooks/useActors';
-import { useAuth } from '@/providers/auth-provider';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+  XCircle,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useActors } from "@/hooks/useActors";
+import { useAuth } from "@/providers/auth-provider";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 export function AccountOverview() {
   const { mainCanister } = useActors();
@@ -48,29 +48,42 @@ export function AccountOverview() {
         const collateralUsdE8s = (Number(pos.collateral_ckbtc) * btcE8) / 1e8;
         setBorrowUsd(debtUsdE8s / 1e8);
         setCollateralCkbtc(Number(pos.collateral_ckbtc) / 1e8);
-        const curLtv = collateralUsdE8s > 0 ? (debtUsdE8s / collateralUsdE8s) : 0;
+        const curLtv = collateralUsdE8s > 0 ? debtUsdE8s / collateralUsdE8s : 0;
         setLtv(curLtv);
         const max = Number(cfg.maxLTVBps) / 10000;
         const liq = Number(cfg.liquidationLTVBps) / 10000;
         setMaxLtv(max);
         setLiqLtv(liq);
-        setHealthFactor(curLtv > 0 ? (liq / curLtv) : null);
+        setHealthFactor(curLtv > 0 ? liq / curLtv : null);
       } catch (e) {
-        console.error('Failed to load account overview', e);
+        console.error("Failed to load account overview", e);
       }
     };
     run();
   }, [identity, mainCanister]);
-  
-  const portfolioData: { name: string; value: number; color: string }[] = useMemo(() => {
-    const collateralUsd = collateralCkbtc * btcUsd;
-    const available = Math.max(collateralUsd * maxLtv - borrowUsd, 0);
-    return [
-      { name: 'ckBTC', value: Number(collateralUsd.toFixed(2)), color: 'hsl(var(--accent-yellow))' },
-      { name: 'USDC Borrowed', value: Number(borrowUsd.toFixed(2)), color: 'hsl(var(--accent-teal))' },
-      { name: 'Available', value: Number(available.toFixed(2)), color: 'hsl(var(--bg-tertiary))' },
-    ];
-  }, [collateralCkbtc, btcUsd, maxLtv, borrowUsd]);
+
+  const portfolioData: { name: string; value: number; color: string }[] =
+    useMemo(() => {
+      const collateralUsd = collateralCkbtc * btcUsd;
+      const available = Math.max(collateralUsd * maxLtv - borrowUsd, 0);
+      return [
+        {
+          name: "ckBTC",
+          value: Number(collateralUsd.toFixed(2)),
+          color: "hsl(var(--accent-yellow))",
+        },
+        {
+          name: "USDC Borrowed",
+          value: Number(borrowUsd.toFixed(2)),
+          color: "hsl(var(--accent-teal))",
+        },
+        {
+          name: "Available",
+          value: Number(available.toFixed(2)),
+          color: "hsl(var(--bg-tertiary))",
+        },
+      ];
+    }, [collateralCkbtc, btcUsd, maxLtv, borrowUsd]);
   useEffect(() => {
     const run = async () => {
       try {
@@ -79,7 +92,7 @@ export function AccountOverview() {
         const res = await (mainCanister as any).getActivity(p);
         setActivities(Array.isArray(res) ? res.slice(0, 6) : []);
       } catch (e) {
-        console.error('Failed to load recent activity', e);
+        console.error("Failed to load recent activity", e);
       }
     };
     run();
@@ -87,11 +100,11 @@ export function AccountOverview() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'good':
+      case "good":
         return <CheckCircle className="w-4 h-4 text-semantic-positive" />;
-      case 'warning':
+      case "warning":
         return <AlertCircle className="w-4 h-4 text-semantic-warning" />;
-      case 'danger':
+      case "danger":
         return <XCircle className="w-4 h-4 text-semantic-negative" />;
       default:
         return null;
@@ -106,11 +119,16 @@ export function AccountOverview() {
     >
       {/* Page Header */}
       <div className="mb-8">
-        <Link to="/" className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" />
           <span className="body-small">Back to Dashboard</span>
         </Link>
-        <h1 className="heading-large text-text-primary mb-2">Account Overview</h1>
+        <h1 className="heading-large text-text-primary mb-2">
+          Account Overview
+        </h1>
         <p className="body-regular text-text-secondary">
           Monitor your portfolio, positions, and account health
         </p>
@@ -126,8 +144,10 @@ export function AccountOverview() {
             transition={{ delay: 0.1 }}
             className="card-container"
           >
-            <h2 className="heading-medium text-text-primary mb-6">Portfolio Summary</h2>
-            
+            <h2 className="heading-medium text-text-primary mb-6">
+              Portfolio Summary
+            </h2>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Chart */}
               <div className="flex items-center justify-center">
@@ -143,16 +163,27 @@ export function AccountOverview() {
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {portfolioData.map((entry: { name: string; value: number; color: string }, index: number) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
+                        {portfolioData.map(
+                          (
+                            entry: {
+                              name: string;
+                              value: number;
+                              color: string;
+                            },
+                            index: number
+                          ) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          )
+                        )}
                       </Pie>
                       <Tooltip />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <p className="heading-large text-text-primary">${totalUsd.toFixed(2)}</p>
+                      <p className="heading-large text-text-primary">
+                        ${totalUsd.toFixed(2)}
+                      </p>
                       <p className="body-tiny text-text-muted">Total Value</p>
                     </div>
                   </div>
@@ -163,19 +194,29 @@ export function AccountOverview() {
               <div className="space-y-4">
                 <div className="card-mini">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="body-small text-text-muted">Net Worth</span>
+                    <span className="body-small text-text-muted">
+                      Net Worth
+                    </span>
                     <TrendingUp className="w-4 h-4 text-accent-mint" />
                   </div>
-                  <p className="heading-medium text-text-primary">${(totalUsd - borrowUsd).toFixed(2)}</p>
-                  <p className="metric-positive body-tiny mt-1">+$4.68 (13.6%)</p>
+                  <p className="heading-medium text-text-primary">
+                    ${(totalUsd - borrowUsd).toFixed(2)}
+                  </p>
+                  <p className="metric-positive body-tiny mt-1">
+                    +$4.68 (13.6%)
+                  </p>
                 </div>
-                
+
                 <div className="card-mini">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="body-small text-text-muted">Total Borrowed</span>
+                    <span className="body-small text-text-muted">
+                      Total Borrowed
+                    </span>
                     <DollarSign className="w-4 h-4 text-accent-teal" />
                   </div>
-                  <p className="heading-medium text-text-primary">${borrowUsd.toFixed(2)}</p>
+                  <p className="heading-medium text-text-primary">
+                    ${borrowUsd.toFixed(2)}
+                  </p>
                   <p className="body-tiny text-text-secondary mt-1">4.5% APR</p>
                 </div>
               </div>
@@ -189,7 +230,9 @@ export function AccountOverview() {
             transition={{ delay: 0.2 }}
             className="card-container"
           >
-            <h2 className="heading-medium text-text-primary mb-4">Active Positions</h2>
+            <h2 className="heading-medium text-text-primary mb-4">
+              Active Positions
+            </h2>
             <div className="space-y-3">
               <div className="bg-bg-tertiary rounded-2xl p-4">
                 <div className="flex items-center justify-between">
@@ -198,8 +241,12 @@ export function AccountOverview() {
                       <Bitcoin className="w-5 h-5 text-accent-yellow" />
                     </div>
                     <div>
-                      <p className="body-regular font-medium text-text-primary">ckBTC Collateral</p>
-                      <p className="body-tiny text-text-muted">{collateralCkbtc.toFixed(8)} ckBTC</p>
+                      <p className="body-regular font-medium text-text-primary">
+                        ckBTC Collateral
+                      </p>
+                      <p className="body-tiny text-text-muted">
+                        {collateralCkbtc.toFixed(8)} ckBTC
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -211,8 +258,12 @@ export function AccountOverview() {
                       <DollarSign className="w-5 h-5 text-accent-teal" />
                     </div>
                     <div>
-                      <p className="body-regular font-medium text-text-primary">ckUSDC Debt</p>
-                      <p className="body-tiny text-text-muted">${borrowUsd.toFixed(2)}</p>
+                      <p className="body-regular font-medium text-text-primary">
+                        ckUSDC Debt
+                      </p>
+                      <p className="body-tiny text-text-muted">
+                        ${borrowUsd.toFixed(2)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -227,17 +278,26 @@ export function AccountOverview() {
             transition={{ delay: 0.3 }}
             className="card-container"
           >
-            <h2 className="heading-medium text-text-primary mb-4">Recent Activity</h2>
+            <h2 className="heading-medium text-text-primary mb-4">
+              Recent Activity
+            </h2>
             <div className="space-y-3">
               {activities.map((a: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between py-3 border-b border-white/[0.05] last:border-0">
+                <div
+                  key={idx}
+                  className="flex items-center justify-between py-3 border-b border-white/[0.05] last:border-0"
+                >
                   <div className="flex items-center gap-3">
-                    <div className={'w-10 h-10 rounded-full flex items-center justify-center bg-accent-mint/20'}>
+                    <div
+                      className={
+                        "w-10 h-10 rounded-full flex items-center justify-center bg-accent-mint/20"
+                      }
+                    >
                       <DollarSign className="w-5 h-5 text-accent-mint" />
                     </div>
                     <div>
                       <p className="body-regular text-text-primary capitalize">
-                        {String(a.kind).replace('_', ' ')} {String(a.token)}
+                        {String(a.kind).replace("_", " ")} {String(a.token)}
                       </p>
                       <p className="body-tiny text-text-muted flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -249,7 +309,8 @@ export function AccountOverview() {
                     <p className="body-regular font-medium text-text-primary">
                       {(() => {
                         const token = String(a.token);
-                        const decimals = token === 'ckBTC' ? 8 : token === 'ckUSDC' ? 6 : 0;
+                        const decimals =
+                          token === "ckBTC" ? 8 : token === "ckUSDC" ? 6 : 0;
                         const n = Number(a.amount) / Math.pow(10, decimals);
                         return `${n.toFixed(decimals > 2 ? 4 : 2)} ${token}`;
                       })()}
@@ -258,7 +319,9 @@ export function AccountOverview() {
                 </div>
               ))}
               {activities.length === 0 && (
-                <p className="body-small text-text-secondary">No recent activity</p>
+                <p className="body-small text-text-secondary">
+                  No recent activity
+                </p>
               )}
             </div>
           </motion.div>
@@ -275,33 +338,59 @@ export function AccountOverview() {
           <div className="card-container">
             <div className="flex items-center gap-2 mb-4">
               <Shield className="w-5 h-5 text-accent-mint" />
-              <h3 className="heading-small text-text-primary">Position Health</h3>
+              <h3 className="heading-small text-text-primary">
+                Position Health
+              </h3>
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="body-small text-text-secondary">Collateral</span>
-                <span className="body-regular font-semibold text-text-primary">{collateralCkbtc.toFixed(8)} ckBTC</span>
+                <span className="body-small text-text-secondary">
+                  Collateral
+                </span>
+                <span className="body-regular font-semibold text-text-primary">
+                  {collateralCkbtc.toFixed(8)} ckBTC
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="body-small text-text-secondary">Debt</span>
-                <span className="body-regular font-semibold text-text-primary">${borrowUsd.toFixed(2)} ckUSDC</span>
+                <span className="body-regular font-semibold text-text-primary">
+                  ${borrowUsd.toFixed(2)} ckUSDC
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="body-small text-text-secondary">Current LTV</span>
-                <span className="body-regular font-semibold text-text-primary">{(ltv * 100).toFixed(2)}%</span>
+                <span className="body-small text-text-secondary">
+                  Current LTV
+                </span>
+                <span className="body-regular font-semibold text-text-primary">
+                  {(ltv * 100).toFixed(2)}%
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="body-small text-text-secondary">Max LTV</span>
-                <span className="body-regular font-semibold text-text-primary">{(maxLtv * 100).toFixed(0)}%</span>
+                <span className="body-regular font-semibold text-text-primary">
+                  {(maxLtv * 100).toFixed(0)}%
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="body-small text-text-secondary">Liquidation LTV</span>
-                <span className="body-regular font-semibold text-semantic-negative">{(liqLtv * 100).toFixed(0)}%</span>
+                <span className="body-small text-text-secondary">
+                  Liquidation LTV
+                </span>
+                <span className="body-regular font-semibold text-semantic-negative">
+                  {(liqLtv * 100).toFixed(0)}%
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="body-small text-text-secondary">Health Factor</span>
-                <span className={`body-regular font-semibold ${healthFactor && healthFactor > 1.2 ? 'text-semantic-positive' : 'text-semantic-warning'}`}>
-                  {healthFactor ? healthFactor.toFixed(2) : '—'}
+                <span className="body-small text-text-secondary">
+                  Health Factor
+                </span>
+                <span
+                  className={`body-regular font-semibold ${
+                    healthFactor && healthFactor > 1.2
+                      ? "text-semantic-positive"
+                      : "text-semantic-warning"
+                  }`}
+                >
+                  {healthFactor ? healthFactor.toFixed(2) : "—"}
                 </span>
               </div>
             </div>
@@ -309,21 +398,25 @@ export function AccountOverview() {
 
           {/* Quick Actions */}
           <div className="card-container">
-            <h3 className="heading-small text-text-primary mb-4">Quick Actions</h3>
+            <h3 className="heading-small text-text-primary mb-4">
+              Quick Actions
+            </h3>
             <div className="space-y-3">
               <Link to="/deposit-btc" className="block">
                 <button className="w-full py-3 px-4 bg-bg-tertiary hover:bg-white/10 rounded-xl text-text-primary font-medium transition-colors text-left">
                   Add Collateral
                 </button>
               </Link>
-              <Link to="/repay-loan" className="block">
+              <Link to="/repay" className="block">
                 <button className="w-full py-3 px-4 bg-bg-tertiary hover:bg-white/10 rounded-xl text-text-primary font-medium transition-colors text-left">
                   Repay Loan
                 </button>
               </Link>
-              <button className="w-full py-3 px-4 bg-bg-tertiary hover:bg-white/10 rounded-xl text-text-primary font-medium transition-colors text-left">
-                Export Report
-              </button>
+              <Link to="/withdraw" className="block">
+                <button className="w-full py-3 px-4 bg-bg-tertiary hover:bg-white/10 rounded-xl text-text-primary font-medium transition-colors text-left">
+                  Withdraw Collateral
+                </button>
+              </Link>
             </div>
           </div>
         </motion.div>

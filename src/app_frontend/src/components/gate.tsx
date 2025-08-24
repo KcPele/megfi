@@ -46,7 +46,7 @@ export const Gate = ({
         </div>
 
         {/* Main Content */}
-        <div className="relative z-10 min-h-screen flex flex-col lg:flex-row">
+        <div className="container mx-auto relative z-10 min-h-screen flex flex-col lg:flex-row">
           {/* Left Section - Info */}
           <div className="order-2 md:order-1 flex-1 flex items-center justify-center p-8 lg:p-16">
             <motion.div
@@ -155,7 +155,7 @@ export const Gate = ({
                 className="grid grid-cols-3 gap-4 p-6 bg-bg-secondary/50 rounded-2xl backdrop-blur-sm border border-white/5"
               >
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-accent-mint">$2.4M</p>
+                  <p className="text-2xl font-bold text-accent-mint">$200</p>
                   <p className="text-xs text-text-secondary">Total Locked</p>
                 </div>
                 <div className="text-center border-x border-white/5">
@@ -163,7 +163,7 @@ export const Gate = ({
                   <p className="text-xs text-text-secondary">Avg APY</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-accent-teal">1.2K</p>
+                  <p className="text-2xl font-bold text-accent-teal">15</p>
                   <p className="text-xs text-text-secondary">Active Users</p>
                 </div>
               </motion.div>

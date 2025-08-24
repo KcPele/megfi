@@ -18,7 +18,6 @@ import { useActors } from '@/hooks/useActors';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { Principal } from '@dfinity/principal';
-import { principalToSubAccount } from '@dfinity/utils';
 import { sanitizeDecimalInput } from '@/lib/utils';
 
 export function BorrowUSDC() {
@@ -33,9 +32,8 @@ export function BorrowUSDC() {
   const [transferBlockIndex, setTransferBlockIndex] = useState<bigint | null>(null);
   
   const { identity } = useAuth();
-  const { ckbtcLedger, mainCanister, ckbtc_ckusdc, ckbtc_icp, icp, ckusdc } = useActors();
+  const { ckbtcLedger, mainCanister, ckusdc } = useActors();
   const principal = identity?.getPrincipal();
-  const subaccount = principalToSubAccount(principal!);
   const { toast } = useToast();
 
   // Calculate loan details based on input
@@ -85,42 +83,41 @@ export function BorrowUSDC() {
       };
 
       const amountInSats = toNatWithDecimals(amount, 8);
-      // Min amount out (ckUSDC has 6 decimals); use 1% slippage on displayed USD
-      const minOut = BigInt(Math.floor(usdcToBorrow * 0.99 * 1e6));
+      // Compute minOut using integer math from on-chain prices to avoid float rounding
+      const prices = await (mainCanister as any).getPrices();
+      const btcUsdE8s = BigInt(prices?.btc_usd_e8s ?? 0);
+      if (btcUsdE8s === 0n) throw new Error('Price unavailable');
+      // amountInSats (8dp) * price (usd e8s) / 1e8 -> usd e8s
+      const usdE8s = (amountInSats * btcUsdE8s) / 100_000_000n;
+      // Convert to USDC e6 by dividing by 1e2, then apply 1% slippage
+      const nominalUsdcE6 = usdE8s / 100n;
+      const minOut = (nominalUsdcE6 * 99n) / 100n; // 1% slippage
 
-      // Approve
-      const approveRes = await mainCanister.approveSwap(amountInSats);
-      if ('Err' in approveRes) {
-        toast({ title: 'Approve failed', description: String(approveRes.Err) });
+      // Perform approve + swap + transfer atomically on backend
+      const result = await (mainCanister as any).borrowWithSwap(
+        amountInSats,
+        minOut,
+        principal as unknown as Principal
+      );
+      if ('Err' in result) {
+        toast({ title: 'Borrow failed', description: String(result.Err) });
         return;
       }
-      setApproveBlockIndex(approveRes.Ok as unknown as bigint);
-      toast({ title: 'Approve succeeded', description: `Block index: ${String(approveRes.Ok)}` });
-
-      // Swap
-      const swapRes = await mainCanister.executeSwap(amountInSats, minOut);
-      if ('Err' in swapRes) {
-        toast({ title: 'Swap failed', description: String(swapRes.Err) });
-        return;
-      }
-      const out: bigint = swapRes.Ok as unknown as bigint;
-      setSwapReceived(out);
-      toast({ title: 'Swap succeeded', description: `Received ${(Number(out) / 1e6).toFixed(2)} ckUSDC` });
-
-      // Transfer
-      const transferRes = await mainCanister.transferUSDC(principal, out);
-      if ('Err' in transferRes) {
-        toast({ title: 'Transfer failed', description: String(transferRes.Err) });
-        return;
-      }
-      setTransferBlockIndex(transferRes.Ok as unknown as bigint);
-      toast({ title: 'Transfer succeeded', description: `Block index: ${String(transferRes.Ok)}` });
+      const ok = result.Ok as { swapAmount: bigint; usdcReceived: bigint };
+      setApproveBlockIndex(0n); // no separate approve block when bundled
+      setSwapReceived(ok.usdcReceived as unknown as bigint);
+      setTransferBlockIndex(0n);
+      toast({ title: 'Borrow succeeded', description: `Received ${(Number(ok.usdcReceived) / 1e6).toFixed(2)} ckUSDC` });
 
       // Refresh balances
       await fetchBalances();
     } catch (error: any) {
       console.error('Error borrowing USDC:', error);
-      toast({ title: 'Error', description: error?.message || 'Unexpected error' });
+      const msg = String(error?.message || error);
+      const hint = msg.includes('canister_not_found')
+        ? 'One or more canister IDs are invalid for this network. Check your .env canister IDs and restart.'
+        : undefined;
+      toast({ title: 'Error', description: hint ? `${msg} — ${hint}` : msg });
     } finally {
       setLoading(false);
     }
